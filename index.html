@@ -4,58 +4,43 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + TS</title>
+    <title>Client-Side Auth with Vite & TS</title>
   </head>
-  <body>
-    <div id="app"></div>
+  <body class="bg-gray-100 text-gray-800 p-8">
+    <div id="app" class="container mx-auto p-4">
+      <div id="createUserSection" class="bg-white p-6 rounded-lg shadow-md mb-6">
+        <h2 class="text-2xl font-semibold mb-4">Create New User</h2>
+        <button id="createUserButton" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+          Create New User
+        </button>
+      </div>
+
+      <div id="loadingSection" style="display: none;" class="bg-white p-6 rounded-lg shadow-md mb-6">
+        <p class="text-lg">Loading...</p>
+      </div>
+
+      <div id="userCreatedSection" style="display: none;" class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-6" role="alert">
+        <p class="font-bold">Success!</p>
+        <p class="text-sm">New user has been created!</p>
+      </div>
+
+      <div id="userInfoSection" style="display: none;" class="bg-white p-6 rounded-lg shadow-md">
+        <h2 class="text-2xl font-semibold mb-4">Additional Information</h2>
+        <form id="userInfoForm">
+          <div class="mb-4">
+            <label for="fullName" class="block text-gray-700 text-sm font-bold mb-2">Full Name:</label>
+            <input type="text" id="fullName" name="fullName" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+          </div>
+          <div class="mb-6">
+            <label for="email" class="block text-gray-700 text-sm font-bold mb-2">Email:</label>
+            <input type="email" id="email" name="email" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline">
+          </div>
+          <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+            Save Information
+          </button>
+        </form>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
-</html>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Client-Side Auth</title>
-    <style>
-        body { font-family: sans-serif; margin: 20px; }
-        div { margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
-        button { padding: 10px 15px; cursor: pointer; }
-        label { display: inline-block; width: 100px; }
-        input { margin-bottom: 10px; padding: 8px; width: 200px; }
-        h2 { margin-top: 0; }
-    </style>
-</head>
-<body>
-
-  <div id="createUserSection">
-    <h2>Create New User</h2>
-    <button id="createUserButton">Create New User</button>
-  </div>
-
-  <div id="loadingSection" style="display: none;">
-    <p>Loading...</p>
-  </div>
-
-  <div id="userCreatedSection" style="display: none;">
-    <p>New user has been created!</p>
-  </div>
-
-  <div id="userInfoSection" style="display: none;">
-    <h2>Additional Information</h2>
-    <form id="userInfoForm">
-      <div>
-        <label for="fullName">Full Name:</label>
-        <input type="text" id="fullName" name="fullName" required>
-      </div>
-      <div>
-        <label for="email">Email:</label>
-        <input type="email" id="email" name="email" required>
-      </div>
-      <button type="submit">Save Information</button>
-    </form>
-  </div>
-
-  <script src="script.js"></script>
-</body>
 </html>
