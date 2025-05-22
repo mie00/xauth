@@ -1,12 +1,3 @@
-import {
-  PRIVATE_KEY_NAME,
-  PUBLIC_KEY_NAME,
-  loadKey,
-  saveKey
-} from './lib/indexedDB'; // Adjusted path
-import QRCode from 'qrcode';
-import jsQR from 'jsqr';
-
 // --- Cryptographic Helper Functions for Wrapping/Unwrapping ---
 
 const PBKDF2_ITERATIONS = 100000; // Number of iterations for PBKDF2
@@ -70,7 +61,7 @@ interface WrappedKeyPayload {
   keyUsages: KeyUsage[];
 }
 
-async function wrapPrivateKeyWithPassword(
+export async function wrapPrivateKeyWithPassword(
   privateKeyToWrap: CryptoKey, // This is the extractable private key
   password: string
 ): Promise<WrappedKeyPayload> {
@@ -99,7 +90,7 @@ async function wrapPrivateKeyWithPassword(
   };
 }
 
-async function unwrapPrivateKeyWithPassword(
+export async function unwrapPrivateKeyWithPassword(
   payload: WrappedKeyPayload,
   password: string
 ): Promise<CryptoKey> { // Returns the unwrapped (original, extractable) private key
@@ -172,7 +163,7 @@ function extractPublicKeyFromJWK(jwk: JsonWebKey): Uint8Array {
   return uncompressedPoint;
 }
 
-async function importJwkAsKeys(jwk: JsonWebKey): Promise<{ importedPrivateKey: CryptoKey; importedPublicKey: CryptoKey }> {
+export async function importJwkAsKeys(jwk: JsonWebKey): Promise<{ importedPrivateKey: CryptoKey; importedPublicKey: CryptoKey }> {
   // Validate JWK structure (basic check for private EC key)
   if (jwk.kty !== "EC" || !jwk.crv || !jwk.x || !jwk.y || !jwk.d) {
       throw new Error("Invalid or incomplete EC JWK structure provided for import.");
@@ -206,7 +197,7 @@ async function importJwkAsKeys(jwk: JsonWebKey): Promise<{ importedPrivateKey: C
 }
 
 
-async function signAndVerify(newPrivate: CryptoKey, publicKey: CryptoKey): Promise<void> {
+export async function signAndVerify(newPrivate: CryptoKey, publicKey: CryptoKey): Promise<void> {
   // 2. Generate a test string and encode it
   const testString = "This is a test string for signing and verification.";
   const encodedData = new TextEncoder().encode(testString);
