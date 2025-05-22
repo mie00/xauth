@@ -15,6 +15,13 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return window.btoa(binary);
 }
 
+// Helper to convert ArrayBuffer to Hex string
+function arrayBufferToHex(buffer: ArrayBuffer): string {
+  return Array.from(new Uint8Array(buffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 // Helper to convert Base64 string to ArrayBuffer
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
   const binary_string = window.atob(base64);
@@ -116,6 +123,55 @@ export async function unwrapPrivateKeyWithPassword(
 }
 
 // --- End Cryptographic Helper Functions ---
+
+// --- Login Token Functions ---
+
+export async function getPublicKeyDigest(publicKey: CryptoKey): Promise<string> {
+  // Export the public key in SPKI format
+  const publicKeySpki = await window.crypto.subtle.exportKey('spki', publicKey);
+  // Hash the SPKI representation using SHA-256
+  const digestBuffer = await window.crypto.subtle.digest('SHA-256', publicKeySpki);
+  // Convert the digest to a hex string
+  return arrayBufferToHex(digestBuffer);
+}
+
+export interface LoginTokenPayload {
+  publicKeyDigest: string; // Hex encoded SHA-256 digest of the public key
+  exp: number;             // Expiry timestamp in milliseconds since epoch
+}
+
+export async function createSignedLoginToken(
+  privateKey: CryptoKey,
+  publicKey: CryptoKey
+): Promise<{ payload: LoginTokenPayload; signature: string }> {
+  const publicKeyDigest = await getPublicKeyDigest(publicKey);
+  const expiryTimestamp = Date.now() + 24 * 60 * 60 * 1000; // 1 day from now
+
+  const payload: LoginTokenPayload = {
+    publicKeyDigest: publicKeyDigest,
+    exp: expiryTimestamp,
+  };
+
+  const payloadString = JSON.stringify(payload);
+  const payloadBuffer = new TextEncoder().encode(payloadString);
+
+  // Sign the UTF-8 encoded payload string
+  const signatureBuffer = await window.crypto.subtle.sign(
+    {
+      name: "ECDSA",
+      hash: { name: "SHA-384" }, // Consistent with signAndVerify
+    },
+    privateKey,
+    payloadBuffer
+  );
+
+  return {
+    payload: payload, // Return the payload object
+    signature: arrayBufferToBase64(signatureBuffer), // Signature as base64 string
+  };
+}
+
+// --- End Login Token Functions ---
 
 export async function generateUserKeysAndWrappedPayload(password: string): Promise<{
   operationalPrivateKey: CryptoKey; // Non-extractable
@@ -287,3 +343,4 @@ export async function signAndVerify(newPrivate: CryptoKey, publicKey: CryptoKey)
 
 // --- End of empty functions ---
 // initializeAuthFlow function has been removed as its logic is migrated to AuthFlow.svelte
+export type { LoginTokenPayload }; // Exporting the type
