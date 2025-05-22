@@ -69,6 +69,7 @@ async function loadKey(keyName: string): Promise<CryptoKey | undefined> {
   });
 }
 import QRCode from 'qrcode';
+import jsQR from 'jsqr';
 
 // --- End IndexedDB Utilities ---
 
@@ -169,6 +170,40 @@ async function createUser(): Promise<{
   return { newPrivate, publicKey, exportedPrivateJwk };
 }
 
+async function importJwkAsKeys(jwk: JsonWebKey): Promise<{ importedPrivateKey: CryptoKey; importedPublicKey: CryptoKey }> {
+  // Validate JWK structure (basic check for private EC key)
+  if (jwk.kty !== "EC" || !jwk.crv || !jwk.x || !jwk.y || !jwk.d) {
+      throw new Error("Invalid or incomplete EC JWK structure provided for import.");
+  }
+
+  // Import the JWK as a non-extractable private key
+  const importedPrivateKey = await window.crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    {
+      name: "ECDSA",
+      namedCurve: jwk.crv, // Use the curve from the JWK
+    },
+    false, // non-extractable
+    ["sign"]
+  );
+
+  // Derive the public key from the imported private key's JWK data
+  const uncompressedPoint = extractPublicKeyFromJWK(jwk); // Use the original JWK
+  const importedPublicKey = await window.crypto.subtle.importKey(
+    "raw",
+    uncompressedPoint,
+    {
+      name: "ECDSA",
+      namedCurve: jwk.crv, // Use the curve from the JWK
+    },
+    true, // public keys are always extractable
+    ["verify"]
+  );
+  return { importedPrivateKey, importedPublicKey };
+}
+
+
 async function signAndVerify(newPrivate: CryptoKey, publicKey: CryptoKey): Promise<void> {
   // 2. Generate a test string and encode it
   const testString = "This is a test string for signing and verification.";
@@ -230,7 +265,115 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
   const qrCodeSection = document.getElementById('qrCodeSection') as HTMLDivElement | null;
   const qrCodeImage = document.getElementById('qrCodeImage') as HTMLImageElement | null;
   const qrCodeSavedButton = document.getElementById('qrCodeSavedButton') as HTMLButtonElement | null;
+  // New DOM elements for QR import
+  const importKeyButton = document.getElementById('importKeyButton') as HTMLButtonElement | null;
+  const importKeySection = document.getElementById('importKeySection') as HTMLDivElement | null;
+  const qrScannerVideo = document.getElementById('qrScannerVideo') as HTMLVideoElement | null;
+  const qrScannerCanvas = document.getElementById('qrScannerCanvas') as HTMLCanvasElement | null;
+  const qrScannerMessage = document.getElementById('qrScannerMessage') as HTMLParagraphElement | null;
+  const cancelImportButton = document.getElementById('cancelImportButton') as HTMLButtonElement | null;
 
+  let currentVideoStream: MediaStream | null = null;
+
+  function stopCamera() {
+    if (currentVideoStream) {
+      currentVideoStream.getTracks().forEach(track => track.stop());
+      currentVideoStream = null;
+    }
+    if (qrScannerVideo) {
+      qrScannerVideo.srcObject = null;
+      qrScannerVideo.pause(); // Ensure video is paused
+      qrScannerVideo.load(); // Release resources
+    }
+  }
+
+  async function handleImportKeyProcess() {
+    if (!importKeySection || !qrScannerVideo || !qrScannerCanvas || !qrScannerMessage || !loadingSection || !createUserSection || !userCreatedSection || !userInfoSection) {
+      console.error("One or more UI elements for import are missing.");
+      return;
+    }
+
+    // UI updates for starting import
+    if (createUserSection) createUserSection.style.display = 'none';
+    if (loadingSection) loadingSection.style.display = 'none';
+    importKeySection.style.display = 'block';
+    qrScannerMessage.textContent = 'Requesting camera access...';
+
+    try {
+      currentVideoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      qrScannerVideo.srcObject = currentVideoStream;
+      await qrScannerVideo.play(); // Ensure play() is awaited or handled as a promise
+
+      const canvasContext = qrScannerCanvas.getContext('2d', { willReadFrequently: true });
+      if (!canvasContext) {
+        throw new Error("Could not get canvas context for QR scanning.");
+      }
+
+      qrScannerMessage.textContent = 'Scanning for QR code...';
+
+      const tick = () => {
+        if (!currentVideoStream || qrScannerVideo.readyState < qrScannerVideo.HAVE_METADATA) {
+          if (currentVideoStream) requestAnimationFrame(tick); // Continue if stream active but video not ready
+          return;
+        }
+
+        qrScannerCanvas.width = qrScannerVideo.videoWidth;
+        qrScannerCanvas.height = qrScannerVideo.videoHeight;
+        canvasContext.drawImage(qrScannerVideo, 0, 0, qrScannerCanvas.width, qrScannerCanvas.height);
+        const imageData = canvasContext.getImageData(0, 0, qrScannerCanvas.width, qrScannerCanvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
+
+        if (code && code.data) {
+          stopCamera();
+          qrScannerMessage.textContent = 'QR code detected. Processing...';
+          importKeySection.style.display = 'none';
+          if (loadingSection) loadingSection.style.display = 'block';
+
+          setTimeout(async () => { // Introduce a small delay for UI to update
+            try {
+              const jwk = JSON.parse(code.data) as JsonWebKey;
+              const { importedPrivateKey, importedPublicKey } = await importJwkAsKeys(jwk);
+
+              await saveKey(importedPrivateKey, PRIVATE_KEY_NAME);
+              await saveKey(importedPublicKey, PUBLIC_KEY_NAME);
+              console.log("Keys imported from QR and saved to IndexedDB.");
+
+              await signAndVerify(importedPrivateKey, importedPublicKey);
+
+              if (loadingSection) loadingSection.style.display = 'none';
+              if (userCreatedSection) userCreatedSection.style.display = 'block';
+              setTimeout(() => {
+                if (userCreatedSection) userCreatedSection.style.display = 'none';
+                if (userInfoSection) userInfoSection.style.display = 'block';
+              }, 1500);
+
+            } catch (importError: any) {
+              console.error("Error processing QR code or importing keys:", importError);
+              stopCamera();
+              if (loadingSection) loadingSection.style.display = 'none';
+              importKeySection.style.display = 'block';
+              qrScannerMessage.textContent = `Error: ${importError.message || "Could not import key."} Cancel and try again.`;
+            }
+          }, 100); // Small delay for UI transition
+        } else {
+          if (currentVideoStream) {
+              requestAnimationFrame(tick);
+          }
+        }
+      };
+      requestAnimationFrame(tick);
+
+    } catch (err: any) {
+      console.error("Error accessing camera or starting scanner:", err);
+      qrScannerMessage.textContent = `Error: ${err.message || "Could not access camera."} Check permissions.`;
+      stopCamera();
+      // Keep importKeySection visible to show the error
+      importKeySection.style.display = 'block';
+      if (createUserSection) createUserSection.style.display = 'none';
+    }
+  }
 
   // Try to load keys from IndexedDB on initialization
   let userPrivateKey: CryptoKey | undefined;
@@ -279,26 +422,29 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
   } else {
     console.log("No keys found in IndexedDB or keys failed to load. User creation flow will be active.");
     // No keys found, or loading failed. Ensure create user UI is visible.
-    if (createUserSection) createUserSection.style.display = 'block';
+    if (createUserSection) createUserSection.style.display = 'block'; // This section now has both buttons
     if (loadingSection) loadingSection.style.display = 'none';
     if (userCreatedSection) userCreatedSection.style.display = 'none';
     if (userInfoSection) userInfoSection.style.display = 'none';
+    if (importKeySection) importKeySection.style.display = 'none'; // Ensure import section is hidden initially
 
-    // Setup the create user button listener only if keys were not loaded
+    // Setup the create user button listener
     if (createUserButton) {
       createUserButton.addEventListener('click', async () => {
-        // Hide create user section, show loading
-        if (createUserSection) createUserSection.style.display = 'none';
+        // Hide initial choice section, show loading
+        if (createUserSection) createUserSection.style.display = 'none'; // This is the section with two buttons
         if (loadingSection) loadingSection.style.display = 'block';
         if (userCreatedSection) userCreatedSection.style.display = 'none';
         if (userInfoSection) userInfoSection.style.display = 'none';
-        if (qrCodeSection) qrCodeSection.style.display = 'none';
+        if (qrCodeSection) qrCodeSection.style.display = 'none'; // This is for showing the QR to save
+        if (importKeySection) importKeySection.style.display = 'none'; // Hide import section if it was somehow visible
 
 
         try {
+          // Key creation logic remains the same, leading to QR display for backup
           const { newPrivate, publicKey, exportedPrivateJwk } = await createUser();
 
-          // Generate QR code from the exportedPrivateJwk
+          // Generate QR code from the exportedPrivateJwk for backup
           const qrDataUrl = await QRCode.toDataURL(JSON.stringify(exportedPrivateJwk), {
             errorCorrectionLevel: 'M', // Medium error correction
             margin: 2, // Margin around QR code
@@ -356,6 +502,24 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
           if (createUserSection) createUserSection.style.display = 'block';
           alert("Failed to create user or generate QR code. Please try again.");
         }
+      });
+    }
+
+    // Setup the import key button listener
+    if (importKeyButton) {
+      importKeyButton.addEventListener('click', () => {
+        handleImportKeyProcess();
+      });
+    }
+
+    // Setup the cancel import button listener
+    if (cancelImportButton) {
+      cancelImportButton.addEventListener('click', () => {
+        stopCamera();
+        if (importKeySection) importKeySection.style.display = 'none';
+        if (qrScannerMessage) qrScannerMessage.textContent = '';
+        if (createUserSection) createUserSection.style.display = 'block'; // Show initial choice section
+        if (loadingSection) loadingSection.style.display = 'none';
       });
     }
 

@@ -9,9 +9,28 @@
   <body class="bg-gray-900 text-gray-100 p-8 flex justify-center items-center min-h-screen">
     <div id="app" class="container p-4 max-w-md flex flex-col items-center">
       <div id="createUserSection" class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
-        <h2 class="text-2xl font-semibold mb-4 text-gray-100">Create New User</h2>
-        <button id="createUserButton" class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">
-          Create New User
+        <h2 class="text-2xl font-semibold mb-4 text-gray-100">Manage Your Account</h2>
+        <p class="text-gray-300 mb-4">Create a new account or import an existing one.</p>
+        <div class="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:space-x-4 justify-center">
+          <button id="createUserButton" class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">
+            Create New Account
+          </button>
+          <button id="importKeyButton" class="bg-sky-500 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded">
+            Import Account via QR
+          </button>
+        </div>
+      </div>
+
+      <div id="importKeySection" style="display: none;" class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
+        <h2 class="text-2xl font-semibold mb-4 text-gray-100">Import Account by QR Code</h2>
+        <p class="text-gray-300 mb-2">Point your camera at the QR code containing your account key.</p>
+        <div class="relative w-full max-w-xs mx-auto mb-4 aspect-square bg-gray-700 rounded overflow-hidden">
+          <video id="qrScannerVideo" playsinline class="absolute top-0 left-0 w-full h-full object-cover"></video>
+          <canvas id="qrScannerCanvas" class="hidden absolute top-0 left-0 w-full h-full"></canvas> <!-- For jsQR processing, can be hidden -->
+        </div>
+        <p id="qrScannerMessage" class="text-red-400 text-sm mb-4 h-6"></p> <!-- For errors or status -->
+        <button id="cancelImportButton" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+          Cancel Import
         </button>
       </div>
 
