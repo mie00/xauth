@@ -1,5 +1,8 @@
-import './style.css'; // Imports global styles, including Tailwind directives
-import { initializeAuthFlow } from './auth';
+import './style.css';
+import App from './App.svelte';
 
-// Initialize the authentication flow logic
-initializeAuthFlow();
+const app = new App({
+  target: document.getElementById('app')!,
+});
+
+export default app;
