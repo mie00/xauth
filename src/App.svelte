@@ -3,18 +3,6 @@
   import AuthFlow from './lib/components/AuthFlow.svelte';
 </script>
 
-<main class="p-8 flex flex-col justify-center items-center min-h-screen bg-gray-900 text-gray-100">
-  <div class="container p-4 max-w-md w-full flex flex-col items-center">
-    <h1 class="text-2xl font-semibold text-gray-100 mb-6 text-center">
-      Client-Side Authentication Demo
-    </h1>
-    <AuthFlow />
-  </div>
+<main class="container p-4 max-w-md flex flex-col items-center">
+  <AuthFlow />
 </main>
-
-<style>
-  /* Ensure main takes full height if not already by global styles */
-  main {
-    min-height: 100vh;
-  }
-</style>

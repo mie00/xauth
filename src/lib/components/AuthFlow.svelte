@@ -60,32 +60,33 @@
 
 <div class="w-full">
   {#if currentStep === 'loading'}
-    <div class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
-      <p class="text-lg text-gray-300">Loading authentication status...</p>
-      <!-- You can add a spinner or more elaborate loading indicator here -->
+    <div id="loadingSection" class="bg-gray-800 text-gray-100 p-6 rounded-lg shadow-md mb-6 flex justify-center items-center">
+      <svg class="animate-spin h-10 w-10 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
     </div>
   {/if}
 
   {#if currentStep === 'initial'}
-    <div class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
-      <h2 class="text-2xl font-semibold mb-4 text-gray-100">Welcome</h2>
-      <p class="text-gray-300 mb-6">No existing user keys found. Please create a new user or import existing keys.</p>
-      <div class="flex justify-center space-x-4">
-        <button class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded" on:click={handleCreateUser}>Create New User</button>
-        <button class="bg-sky-500 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded" on:click={handleImportKey}>Import Existing Key</button>
+    <div id="createUserSection" class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
+      <h2 class="text-2xl font-semibold mb-4 text-gray-100">Manage Your Account</h2>
+      <p class="text-gray-300 mb-4">Create a new account or import an existing one.</p>
+      <div class="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:space-x-4 justify-center">
+        <button id="createUserButton" class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded" on:click={handleCreateUser}>
+          Create New Account
+        </button>
+        <button id="importKeyButton" class="bg-sky-500 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded" on:click={handleImportKey}>
+          Import Account via QR
+        </button>
       </div>
     </div>
   {/if}
 
   {#if currentStep === 'userReady'}
-    <div class="bg-green-700 border border-green-600 text-green-100 px-4 py-3 rounded relative mb-6 text-center" role="alert">
-      <h2 class="text-xl font-bold mb-2">User Ready</h2>
-      <p class="text-sm">Your keys are loaded and verified. You are ready to proceed.</p>
-      <!-- Add further actions for a ready user, e.g., export, sign data, etc. -->
-      <div class="mt-6 flex justify-center space-x-4">
-         <!-- Placeholder for future actions like "Export Key Again" or "Sign Out (Clear Keys)" -->
-         <button class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" on:click={() => { currentStep = 'initial'; userPrivateKey = undefined; userPublicKey = undefined; console.log("Simulating sign out/reset"); alert("Keys cleared for demo. Refresh or re-create."); }}>Reset (Dev)</button>
-      </div>
+    <div id="userCreatedSection" class="bg-green-700 border border-green-600 text-green-100 px-4 py-3 rounded relative mb-6 text-center" role="alert">
+      <p class="font-bold">Login Successful!</p>
+      <p class="text-sm">Your account is ready and keys are active.</p>
     </div>
   {/if}
 
@@ -94,23 +95,25 @@
       <h2 class="text-2xl font-semibold mb-4 text-red-400">Authentication Error</h2>
       <p class="text-gray-300 mb-4">{errorMessage || "An unexpected error occurred."}</p>
       <div class="flex justify-center">
-        <button class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded" on:click={() => currentStep = 'initial'}>Try Again</button>
+        <button class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded" on:click={() => { currentStep = 'initial'; errorMessage = null; }}>Try Again</button>
       </div>
     </div>
   {/if}
 
   {#if currentStep === 'createUser'}
-    <div class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
-      <p class="text-gray-300 mb-4">User Creation (Work In Progress)...</p>
-      <!-- User creation UI will go here -->
+    <div id="qrCodeSection" class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
+      <h2 class="text-2xl font-semibold mb-4 text-gray-100">Secure & Save Your Account Key</h2>
+      <p class="text-gray-300 mb-4">Password setup and QR generation will appear here.</p>
+      <!-- User creation UI (password, QR display) will go here -->
       <button class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mt-4" on:click={() => currentStep = 'initial'}>Back</button>
     </div>
   {/if}
 
   {#if currentStep === 'importKey'}
-    <div class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
-      <p class="text-gray-300 mb-4">Import Key (Work In Progress)...</p>
-      <!-- Key import UI will go here -->
+    <div id="importKeySection" class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
+      <h2 class="text-2xl font-semibold mb-4 text-gray-100">Import Account by QR Code</h2>
+      <p class="text-gray-300 mb-4">QR scanner and password input will appear here.</p>
+      <!-- Key import UI (scanner, password) will go here -->
       <button class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mt-4" on:click={() => currentStep = 'initial'}>Back</button>
     </div>
   {/if}
