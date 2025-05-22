@@ -85,7 +85,9 @@ async function createUser(): Promise<void> {
     ["verify"],
   );
   console.log("Imported Public Key:", publicKey);
+}
 
+async function signAndVerify(newPrivate: CryptoKey, publicKey: CryptoKey): Promise<void> {
   // 2. Generate a test string and encode it
   const testString = "This is a test string for signing and verification.";
   const encodedData = new TextEncoder().encode(testString);
