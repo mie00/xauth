@@ -155,12 +155,14 @@ export interface LoginTokenPayload {
   sub: string; // Subject: The callback URL
   exp: number; // Expiry timestamp in seconds since epoch (JWT standard)
   iat: number; // Issued at timestamp in seconds since epoch (JWT standard)
+  cstm_dat?: string; // For custom payload data from query param
 }
 
 export async function createSignedLoginToken(
   privateKey: CryptoKey,
   publicKey: CryptoKey,
-  callbackUrl: string
+  callbackUrl: string,
+  customPayloadData?: string | null
 ): Promise<string> { // Returns the full JWT string
   const publicKeyDigest = await getPublicKeyDigest(publicKey);
   const nowSeconds = Math.floor(Date.now() / 1000);
@@ -180,6 +182,9 @@ export async function createSignedLoginToken(
     exp: expirySeconds,
     iat: nowSeconds,
   };
+  if (customPayloadData) {
+    payload.cstm_dat = customPayloadData;
+  }
   const encodedPayload = stringToBase64Url(JSON.stringify(payload));
 
   // Data to sign

@@ -11,7 +11,7 @@
   import LoadingSpinner from './auth/LoadingSpinner.svelte';
   import ConfirmLoginStep from './auth/ConfirmLoginStep.svelte';
 
-  const {rawCallbackParam}:{rawCallbackParam: string | null} = $props();
+  const {rawCallbackParam, loginPayloadData}:{rawCallbackParam: string | null, loginPayloadData?: string | null} = $props();
 
   type LoginStep = 'loading' | 'awaitingConfirmation' | 'processingLogin' | 'error';
   let currentStep: LoginStep = $state('loading');
@@ -61,7 +61,7 @@
       const isTrusted = await isCallbackUrlTrusted(parsedCallbackUrl.toString());
 
       if (isTrusted) {
-        await proceedWithLogin(privateKey, publicKey, parsedCallbackUrl);
+        await proceedWithLogin(privateKey, publicKey, parsedCallbackUrl, loginPayloadData);
       } else {
         currentStep = 'awaitingConfirmation';
       }
@@ -72,11 +72,11 @@
     }
   });
 
-  async function proceedWithLogin(privateKey: CryptoKey, publicKey: CryptoKey, callbackUrl: URL) {
+  async function proceedWithLogin(privateKey: CryptoKey, publicKey: CryptoKey, callbackUrl: URL, customPayload?: string | null) {
     currentStep = 'processingLogin';
     errorMessage = null;
     try {
-      const jwtToken = await createSignedLoginToken(privateKey, publicKey, callbackUrl.toString());
+      const jwtToken = await createSignedLoginToken(privateKey, publicKey, callbackUrl.toString(), customPayload);
       
       const redirectUrl = new URL(callbackUrl.toString());
       redirectUrl.searchParams.set('jwt', jwtToken);
@@ -111,7 +111,7 @@
         currentStep = 'error';
         return;
       }
-      await proceedWithLogin(privateKey, publicKey, parsedCallbackUrl);
+      await proceedWithLogin(privateKey, publicKey, parsedCallbackUrl, loginPayloadData);
     } catch (error: any) {
       console.error("Error after login confirmation:", error);
       errorMessage = `Failed to process login after confirmation: ${error.message || "Unknown error"}`;
