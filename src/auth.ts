@@ -49,42 +49,29 @@ function extractPublicKeyFromJWK(jwk: JsonWebKey): Uint8Array {
  * It introduces a delay to mimic an asynchronous operation.
  */
 async function createUser(): Promise<void> {
-    console.log("Attempting to create a new user (simulation)...");
-    // Simulate a delay (e.g., API call)
-    const {publicKey, privateKey} = await window.crypto.subtle.generateKey(
-      {
-        name: "ECDSA",
-        namedCurve: "P-384",
-      },
-      true,
-      ["sign", "verify"],
-    );
-    // const exportedPublic = await window.crypto.subtle.exportKey("raw", publicKey)
-    const exportedPrivate = await window.crypto.subtle.exportKey("jwk", privateKey);
-    const rawPublicKeyBuffer = await window.crypto.subtle.exportKey("raw", publicKey);
-    const newPrivate = await window.crypto.subtle.importKey(
-        "jwk",
-        exportedPrivate,
-        {
-        name: "ECDSA",
-        namedCurve: "P-384",
-        },
-        true,
-        ["sign"],
-    );
-    console.log(newPrivate);
-    // get newPublic from newPrivate
-    // Compare
-    const uncompressedPoint = extractPublicKeyFromJWK(exportedPrivate);
-    const inputRaw = new Uint8Array(rawPublicKeyBuffer);
-    const equal = inputRaw.length === uncompressedPoint.length &&
-                    inputRaw.every((b, i) => b === uncompressedPoint[i]);
-
-    console.log("Original public key (hex):", [...inputRaw].map(b => b.toString(16).padStart(2, '0')).join(''));
-    console.log("Computed public key (hex):", [...uncompressedPoint].map(b => b.toString(16).padStart(2, '0')).join(''));
-    console.log("Matches provided public key?", equal);
-
-    console.log("User creation simulation complete.");
+  console.log("Attempting to create a new user (simulation)...");
+  // Simulate a delay (e.g., API call)
+  const { privateKey } = await window.crypto.subtle.generateKey(
+    {
+      name: "ECDSA",
+      namedCurve: "P-384",
+    },
+    true,
+    ["sign", "verify"],
+  );
+  const exportedPrivate = await window.crypto.subtle.exportKey("jwk", privateKey);
+  const newPrivate = await window.crypto.subtle.importKey(
+    "jwk",
+    exportedPrivate,
+    {
+      name: "ECDSA",
+      namedCurve: "P-384",
+    },
+    false,
+    ["sign"],
+  );
+  console.log(newPrivate);
+  const uncompressedPoint = extractPublicKeyFromJWK(exportedPrivate);
 }
 
 /**
@@ -93,73 +80,73 @@ async function createUser(): Promise<void> {
  * @param {object} data - The user information to save.
  */
 function saveInformation(data: Record<string, string>): void {
-    console.log("Attempting to save user information (simulation):", data);
-    // In a real application, you would send this data to a server or store it.
-    console.log("User information 'saved' (simulation complete).");
+  console.log("Attempting to save user information (simulation):", data);
+  // In a real application, you would send this data to a server or store it.
+  console.log("User information 'saved' (simulation complete).");
 }
 
 // --- End of empty functions ---
 
 export function initializeAuthFlow(): void {
-    // DOM Elements
-    const createUserSection = document.getElementById('createUserSection') as HTMLDivElement | null;
-    const loadingSection = document.getElementById('loadingSection') as HTMLDivElement | null;
-    const userCreatedSection = document.getElementById('userCreatedSection') as HTMLDivElement | null;
-    const userInfoSection = document.getElementById('userInfoSection') as HTMLDivElement | null;
-    const createUserButton = document.getElementById('createUserButton') as HTMLButtonElement | null;
-    const userInfoForm = document.getElementById('userInfoForm') as HTMLFormElement | null;
+  // DOM Elements
+  const createUserSection = document.getElementById('createUserSection') as HTMLDivElement | null;
+  const loadingSection = document.getElementById('loadingSection') as HTMLDivElement | null;
+  const userCreatedSection = document.getElementById('userCreatedSection') as HTMLDivElement | null;
+  const userInfoSection = document.getElementById('userInfoSection') as HTMLDivElement | null;
+  const createUserButton = document.getElementById('createUserButton') as HTMLButtonElement | null;
+  const userInfoForm = document.getElementById('userInfoForm') as HTMLFormElement | null;
 
-    if (createUserButton) {
-        createUserButton.addEventListener('click', async () => {
-            // Hide create user section, show loading
-            if (createUserSection) createUserSection.style.display = 'none';
-            if (loadingSection) loadingSection.style.display = 'block';
-            if (userCreatedSection) userCreatedSection.style.display = 'none';
-            if (userInfoSection) userInfoSection.style.display = 'none';
+  if (createUserButton) {
+    createUserButton.addEventListener('click', async () => {
+      // Hide create user section, show loading
+      if (createUserSection) createUserSection.style.display = 'none';
+      if (loadingSection) loadingSection.style.display = 'block';
+      if (userCreatedSection) userCreatedSection.style.display = 'none';
+      if (userInfoSection) userInfoSection.style.display = 'none';
 
-            try {
-                await createUser(); // Call the empty function that simulates delay
+      try {
+        await createUser(); // Call the empty function that simulates delay
 
-                // Hide loading, show user created message
-                if (loadingSection) loadingSection.style.display = 'none';
-                if (userCreatedSection) userCreatedSection.style.display = 'block';
+        // Hide loading, show user created message
+        if (loadingSection) loadingSection.style.display = 'none';
+        if (userCreatedSection) userCreatedSection.style.display = 'block';
 
-                // After a brief moment, show the additional information form
-                setTimeout(() => {
-                    if (userCreatedSection) userCreatedSection.style.display = 'none'; // Optionally hide the "user created" message
-                    if (userInfoSection) userInfoSection.style.display = 'block';
-                }, 1500); // Show info form after 1.5 seconds
+        // After a brief moment, show the additional information form
+        setTimeout(() => {
+          if (userCreatedSection) userCreatedSection.style.display = 'none'; // Optionally hide the "user created" message
+          if (userInfoSection) userInfoSection.style.display = 'block';
+        }, 1500); // Show info form after 1.5 seconds
 
-            } catch (error) {
-                console.error("Error during user creation simulation:", error);
-                // Handle error: show error message, revert to initial state, etc.
-                if (loadingSection) loadingSection.style.display = 'none';
-                if (createUserSection) createUserSection.style.display = 'block'; // Show create user section again
-                alert("Simulation failed: Could not create user.");
-            }
-        });
-    }
+      } catch (error) {
+        console.error("Error during user creation simulation:", error);
+        // Handle error: show error message, revert to initial state, etc.
+        if (loadingSection) loadingSection.style.display = 'none';
+        if (createUserSection) createUserSection.style.display = 'block'; // Show create user section again
+        alert("Simulation failed: Could not create user.");
+      }
+    });
+  }
 
-    if (userInfoForm) {
-        userInfoForm.addEventListener('submit', (event: SubmitEvent) => {
-            event.preventDefault(); // Prevent default form submission
+  if (userInfoForm) {
+    userInfoForm.addEventListener('submit', (event: SubmitEvent) => {
+      event.preventDefault(); // Prevent default form submission
 
-            const formData = new FormData(userInfoForm);
-            const data: Record<string, string> = {};
-            formData.forEach((value, key) => {
-                if (typeof value === 'string') {
-                    data[key] = value;
-                }
-            });
+      const formData = new FormData(userInfoForm);
+      const data: Record<string, string> = {};
+      formData.forEach((value, key) => {
+        if (typeof value === 'string') {
+          data[key] = value;
+        }
+      });
 
-            saveInformation(data); // Call the empty function
+      saveInformation(data); // Call the empty function
 
-            alert("Information 'saved' (simulation - check console).");
-            
-            // Optionally, reset the form and UI
-            userInfoForm.reset();
-            if (userInfoSection) userInfoSection.style.display = 'none';
-            if (createUserSection) createUserSection.style.display = 'block'; // Go back to initial state
-        });
-    }
+      alert("Information 'saved' (simulation - check console).");
+
+      // Optionally, reset the form and UI
+      userInfoForm.reset();
+      if (userInfoSection) userInfoSection.style.display = 'none';
+      if (createUserSection) createUserSection.style.display = 'block'; // Go back to initial state
+    });
+  }
 }
