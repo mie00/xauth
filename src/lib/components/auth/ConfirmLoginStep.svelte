@@ -6,8 +6,8 @@
   <h2 class="text-xl font-semibold mb-4 text-gray-700">Confirm Login</h2>
   <p class="mb-2 text-gray-600">An application is requesting to log in with your identity.</p>
   <p class="mb-1 text-gray-600">Callback URL:</p>
-  <p class="mb-6 text-sm font-mono bg-gray-100 p-2 rounded break-all">{callbackUrl}</p>
-  
+  <p class="mb-6 text-sm font-mono bg-gray-100 text-gray-600 p-2 rounded break-all">{callbackUrl}</p>
+
   <p class="mb-6 text-gray-600">Do you want to allow this application to log in?</p>
 
   <div class="flex justify-center space-x-4">

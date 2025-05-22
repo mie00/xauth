@@ -178,7 +178,7 @@
   {/if}
 
   {#if currentStep === 'userReady'}
-    <UserReadyStep />
+    <UserReadyStep publicKey={userPublicKey} />
   {/if}
 
   {#if currentStep === 'error'}

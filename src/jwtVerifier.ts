@@ -101,3 +101,13 @@ export async function verifyLoginJWT(
     throw new Error(`JWT Verifier: Verification failed. ${errorMessage}`);
   }
 }
+
+
+window.verifyLoginJWT = verifyLoginJWT;
+
+// add verifyLoginJWT to window type
+declare global {
+  interface Window {
+    verifyLoginJWT: typeof verifyLoginJWT;
+  }
+}
