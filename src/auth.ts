@@ -240,17 +240,6 @@ async function signAndVerify(newPrivate: CryptoKey, publicKey: CryptoKey): Promi
   }
 }
 
-/**
- * Simulates saving additional user information.
- * This function is a placeholder and does not perform actual data saving.
- * @param {object} data - The user information to save.
- */
-function saveInformation(data: Record<string, string>): void {
-  console.log("Attempting to save user information (simulation):", data);
-  // In a real application, you would send this data to a server or store it.
-  console.log("User information 'saved' (simulation complete).");
-}
-
 // --- End of empty functions ---
 
 export async function initializeAuthFlow(): Promise<void> { // Make async
@@ -258,9 +247,9 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
   const createUserSection = document.getElementById('createUserSection') as HTMLDivElement | null;
   const loadingSection = document.getElementById('loadingSection') as HTMLDivElement | null;
   const userCreatedSection = document.getElementById('userCreatedSection') as HTMLDivElement | null;
-  const userInfoSection = document.getElementById('userInfoSection') as HTMLDivElement | null;
+  // const userInfoSection = document.getElementById('userInfoSection') as HTMLDivElement | null; // Removed
   const createUserButton = document.getElementById('createUserButton') as HTMLButtonElement | null;
-  const userInfoForm = document.getElementById('userInfoForm') as HTMLFormElement | null;
+  // const userInfoForm = document.getElementById('userInfoForm') as HTMLFormElement | null; // Removed
   // New DOM elements for QR code section
   const qrCodeSection = document.getElementById('qrCodeSection') as HTMLDivElement | null;
   const qrCodeImage = document.getElementById('qrCodeImage') as HTMLImageElement | null;
@@ -288,7 +277,7 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
   }
 
   async function handleImportKeyProcess() {
-    if (!importKeySection || !qrScannerVideo || !qrScannerCanvas || !qrScannerMessage || !loadingSection || !createUserSection || !userCreatedSection || !userInfoSection) {
+    if (!importKeySection || !qrScannerVideo || !qrScannerCanvas || !qrScannerMessage || !loadingSection || !createUserSection || !userCreatedSection /* || !userInfoSection - removed */) {
       console.error("One or more UI elements for import are missing.");
       return;
     }
@@ -343,11 +332,8 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
               await signAndVerify(importedPrivateKey, importedPublicKey);
 
               if (loadingSection) loadingSection.style.display = 'none';
-              if (userCreatedSection) userCreatedSection.style.display = 'block';
-              setTimeout(() => {
-                if (userCreatedSection) userCreatedSection.style.display = 'none';
-                if (userInfoSection) userInfoSection.style.display = 'block';
-              }, 1500);
+              if (userCreatedSection) userCreatedSection.style.display = 'block'; // Show success message and keep it
+              // No longer transitioning to userInfoSection
 
             } catch (importError: any) {
               console.error("Error processing QR code or importing keys:", importError);
@@ -392,8 +378,8 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
     // Keys exist, adjust UI to reflect this (e.g., skip creation step)
     if (createUserSection) createUserSection.style.display = 'none';
     if (loadingSection) loadingSection.style.display = 'none';
-    if (userCreatedSection) userCreatedSection.style.display = 'block'; // Or a "Welcome back" message
-    if (userInfoSection) userInfoSection.style.display = 'none'; // Initially hide, will be shown by timeout
+    if (userCreatedSection) userCreatedSection.style.display = 'block'; // Show success message
+    // if (userInfoSection) userInfoSection.style.display = 'none'; // Removed
 
     // Demonstrate that the loaded keys can be used for cryptographic operations
     console.log("Attempting to sign and verify with loaded keys...");
@@ -413,11 +399,8 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
       //   .catch(delErr => console.error("Error deleting problematic keys:", delErr));
     }
 
-    // After a brief moment, show the additional information form
-    setTimeout(() => {
-      if (userCreatedSection) userCreatedSection.style.display = 'none';
-      if (userInfoSection) userInfoSection.style.display = 'block';
-    }, 1500);
+    // The userCreatedSection is already visible and will remain so.
+    // No timeout or transition to another section is needed.
 
   } else {
     console.log("No keys found in IndexedDB or keys failed to load. User creation flow will be active.");
@@ -425,7 +408,7 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
     if (createUserSection) createUserSection.style.display = 'block'; // This section now has both buttons
     if (loadingSection) loadingSection.style.display = 'none';
     if (userCreatedSection) userCreatedSection.style.display = 'none';
-    if (userInfoSection) userInfoSection.style.display = 'none';
+    // if (userInfoSection) userInfoSection.style.display = 'none'; // Removed
     if (importKeySection) importKeySection.style.display = 'none'; // Ensure import section is hidden initially
 
     // Setup the create user button listener
@@ -435,7 +418,7 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
         if (createUserSection) createUserSection.style.display = 'none'; // This is the section with two buttons
         if (loadingSection) loadingSection.style.display = 'block';
         if (userCreatedSection) userCreatedSection.style.display = 'none';
-        if (userInfoSection) userInfoSection.style.display = 'none';
+        // if (userInfoSection) userInfoSection.style.display = 'none'; // Removed
         if (qrCodeSection) qrCodeSection.style.display = 'none'; // This is for showing the QR to save
         if (importKeySection) importKeySection.style.display = 'none'; // Hide import section if it was somehow visible
 
@@ -488,11 +471,8 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
                 // but it's important to log.
               }
 
-              // After a brief moment, show the additional information form
-              setTimeout(() => {
-                if (userCreatedSection) userCreatedSection.style.display = 'none';
-                if (userInfoSection) userInfoSection.style.display = 'block';
-              }, 1500);
+              // The userCreatedSection is already visible from the click handler.
+              // No timeout or transition to another section is needed.
             }, { once: true }); // Ensure this listener fires only once per button instance
           }
 
@@ -523,27 +503,6 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
       });
     }
 
-    if (userInfoForm) {
-      userInfoForm.addEventListener('submit', (event: SubmitEvent) => {
-        event.preventDefault(); // Prevent default form submission
-
-        const formData = new FormData(userInfoForm);
-        const data: Record<string, string> = {};
-        formData.forEach((value, key) => {
-          if (typeof value === 'string') {
-            data[key] = value;
-          }
-        });
-
-        saveInformation(data); // Call the empty function
-
-        alert("Information 'saved' (simulation - check console).");
-
-        // Optionally, reset the form and UI
-        userInfoForm.reset();
-        if (userInfoSection) userInfoSection.style.display = 'none';
-        if (createUserSection) createUserSection.style.display = 'block'; // Go back to initial state
-      });
-    }
+    // Removed userInfoForm event listener as the form itself is removed.
   }
 }
