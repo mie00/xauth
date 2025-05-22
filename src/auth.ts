@@ -72,6 +72,53 @@ async function createUser(): Promise<void> {
   );
   console.log(newPrivate);
   const uncompressedPoint = extractPublicKeyFromJWK(exportedPrivate);
+
+  // 1. Import the uncompressedPoint as a public CryptoKey
+  const publicKey = await window.crypto.subtle.importKey(
+    "raw",
+    uncompressedPoint,
+    {
+      name: "ECDSA",
+      namedCurve: "P-384",
+    },
+    true,
+    ["verify"],
+  );
+  console.log("Imported Public Key:", publicKey);
+
+  // 2. Generate a test string and encode it
+  const testString = "This is a test string for signing and verification.";
+  const encodedData = new TextEncoder().encode(testString);
+  console.log("Encoded data for signing:", encodedData);
+
+  // 3. Sign the encoded string using the newPrivate key
+  const signature = await window.crypto.subtle.sign(
+    {
+      name: "ECDSA",
+      hash: { name: "SHA-384" },
+    },
+    newPrivate, // The private key CryptoKey object
+    encodedData, // The data to sign
+  );
+  console.log("Signature:", signature);
+
+  // 4. Verify the signature using the imported public key
+  const isValid = await window.crypto.subtle.verify(
+    {
+      name: "ECDSA",
+      hash: { name: "SHA-384" },
+    },
+    publicKey, // The public key CryptoKey object
+    signature, // The signature to verify
+    encodedData, // The original data
+  );
+
+  // 5. Log the verification result
+  if (isValid) {
+    console.log("Signature verification successful!");
+  } else {
+    console.error("Signature verification failed.");
+  }
 }
 
 /**
