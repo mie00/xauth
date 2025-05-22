@@ -15,6 +15,21 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return window.btoa(binary);
 }
 
+// Helper to convert ArrayBuffer to Base64url string
+function arrayBufferToBase64Url(buffer: ArrayBuffer): string {
+  return arrayBufferToBase64(buffer)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+// Helper to convert a UTF-8 string to Base64url string
+function stringToBase64Url(str: string): string {
+  const encoder = new TextEncoder();
+  const buffer = encoder.encode(str);
+  return arrayBufferToBase64Url(buffer);
+}
+
 // Helper to convert ArrayBuffer to Hex string
 function arrayBufferToHex(buffer: ArrayBuffer): string {
   return Array.from(new Uint8Array(buffer))
@@ -136,39 +151,55 @@ export async function getPublicKeyDigest(publicKey: CryptoKey): Promise<string> 
 }
 
 export interface LoginTokenPayload {
-  publicKeyDigest: string; // Hex encoded SHA-256 digest of the public key
-  exp: number;             // Expiry timestamp in milliseconds since epoch
+  iss: string; // Issuer: Hex encoded SHA-256 digest of the public key
+  sub: string; // Subject: The callback URL
+  exp: number; // Expiry timestamp in seconds since epoch (JWT standard)
+  iat: number; // Issued at timestamp in seconds since epoch (JWT standard)
 }
 
 export async function createSignedLoginToken(
   privateKey: CryptoKey,
-  publicKey: CryptoKey
-): Promise<{ payload: LoginTokenPayload; signature: string }> {
+  publicKey: CryptoKey,
+  callbackUrl: string
+): Promise<string> { // Returns the full JWT string
   const publicKeyDigest = await getPublicKeyDigest(publicKey);
-  const expiryTimestamp = Date.now() + 24 * 60 * 60 * 1000; // 1 day from now
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const expirySeconds = nowSeconds + (24 * 60 * 60); // 1 day from now in seconds
 
-  const payload: LoginTokenPayload = {
-    publicKeyDigest: publicKeyDigest,
-    exp: expiryTimestamp,
+  // JWT Header
+  const header = {
+    alg: "ES384", // ECDSA using P-384 curve and SHA-384 hash
+    typ: "JWT"
   };
+  const encodedHeader = stringToBase64Url(JSON.stringify(header));
 
-  const payloadString = JSON.stringify(payload);
-  const payloadBuffer = new TextEncoder().encode(payloadString);
+  // JWT Payload
+  const payload: LoginTokenPayload = {
+    iss: publicKeyDigest,
+    sub: callbackUrl,
+    exp: expirySeconds,
+    iat: nowSeconds,
+  };
+  const encodedPayload = stringToBase64Url(JSON.stringify(payload));
 
-  // Sign the UTF-8 encoded payload string
+  // Data to sign
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const signingInputBuffer = new TextEncoder().encode(signingInput);
+
+  // Sign the data
   const signatureBuffer = await window.crypto.subtle.sign(
     {
       name: "ECDSA",
-      hash: { name: "SHA-384" }, // Consistent with signAndVerify
+      hash: { name: "SHA-384" }, // Must match alg in header
     },
     privateKey,
-    payloadBuffer
+    signingInputBuffer
   );
 
-  return {
-    payload: payload, // Return the payload object
-    signature: arrayBufferToBase64(signatureBuffer), // Signature as base64 string
-  };
+  const encodedSignature = arrayBufferToBase64Url(signatureBuffer);
+
+  // Assemble the JWT
+  return `${signingInput}.${encodedSignature}`;
 }
 
 // --- End Login Token Functions ---

@@ -48,14 +48,14 @@
           return;
         }
 
-        const { payload, signature } = await createSignedLoginToken(privateKey, publicKey);
+        const jwtToken = await createSignedLoginToken(privateKey, publicKey, callbackUrl.toString());
         
-        // Append payload and signature to the callback URL
-        callbackUrl.searchParams.set('login_payload', JSON.stringify(payload));
-        callbackUrl.searchParams.set('login_signature', signature);
+        // Append JWT to the callback URL
+        const redirectUrl = new URL(callbackUrl.toString()); // Create a new URL object to safely add params
+        redirectUrl.searchParams.set('jwt', jwtToken);
         
         // Perform the redirect
-        window.location.replace(callbackUrl.toString());
+        window.location.replace(redirectUrl.toString());
         // A "Redirecting..." message will be shown by the 'loginHandler' view until the browser navigates away.
       } catch (error: any) {
         console.error("Error during login token generation or redirect:", error);
