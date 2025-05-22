@@ -35,14 +35,6 @@
         return;
       }
 
-      // Check for any unexpected query parameters in the rawCallbackParam
-      // At this stage, we don't expect any parameters. 'jwt' is added by this component later.
-      if (parsedCallbackUrl.searchParams.toString() !== '') {
-        errorMessage = "Invalid 'callback' URL: Unknown parameters are present in the callback URL.";
-        currentStep = 'error';
-        return;
-      }
-
     } catch (e) {
       errorMessage = "Invalid 'callback' URL format. Please provide a full, valid URL (e.g., https://example.com/path).";
       currentStep = 'error';
