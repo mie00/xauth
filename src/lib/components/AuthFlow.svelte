@@ -77,7 +77,7 @@
       const keyPair = await window.crypto.subtle.generateKey(
         { name: "ECDSA", namedCurve: "P-384" },
         true, // private key needs to be extractable for wrapping
-        ["sign"] // private key usage
+        ["sign", "verify"] // private key usage
       ) as CryptoKeyPair;
 
       const extractablePrivateKey = keyPair.privateKey;
