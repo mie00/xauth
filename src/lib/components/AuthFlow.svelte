@@ -4,7 +4,7 @@
   import { 
     signAndVerify, 
     generateUserKeysAndWrappedPayload, 
-    unwrapAndImportKeysFromPayload 
+    unwrapAndImportKeysFromPayload,
   } from '../../auth';
   import QRCode from 'qrcode';
 
@@ -50,6 +50,8 @@
         console.log("User keys successfully loaded from IndexedDB.");
         try {
           await signAndVerify(userPrivateKey, userPublicKey);
+          // print digest of public key
+          console.log("pub", userPublicKey)
           console.log("Sign and verify with loaded keys was successful.");
           currentStep = 'userReady';
         } catch (e: any) {

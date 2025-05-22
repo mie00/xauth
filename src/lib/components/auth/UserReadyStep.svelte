@@ -84,7 +84,7 @@
       {#if publicKeyJwkString && !generationError}
         <div class="mt-4 w-full max-w-md">
           <button
-            on:click={copyToClipboard}
+            onclick={copyToClipboard}
             class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
           >
             Copy Public Key JWK to Clipboard
