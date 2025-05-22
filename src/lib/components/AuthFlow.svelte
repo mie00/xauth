@@ -58,65 +58,61 @@
 
 </script>
 
-<div class="p-4 bg-gray-800 shadow-md rounded-lg">
+<div class="w-full">
   {#if currentStep === 'loading'}
-    <p class="text-center text-lg">Loading authentication status...</p>
-    <!-- You can add a spinner or more elaborate loading indicator here -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
+      <p class="text-lg text-gray-300">Loading authentication status...</p>
+      <!-- You can add a spinner or more elaborate loading indicator here -->
+    </div>
   {/if}
 
   {#if currentStep === 'initial'}
-    <h2 class="text-xl font-semibold mb-4 text-center">Welcome</h2>
-    <p class="text-center mb-6">No existing user keys found. Please create a new user or import existing keys.</p>
-    <div class="flex justify-center space-x-4">
-      <button on:click={handleCreateUser}>Create New User</button>
-      <button on:click={handleImportKey}>Import Existing Key</button>
+    <div class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
+      <h2 class="text-2xl font-semibold mb-4 text-gray-100">Welcome</h2>
+      <p class="text-gray-300 mb-6">No existing user keys found. Please create a new user or import existing keys.</p>
+      <div class="flex justify-center space-x-4">
+        <button class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded" on:click={handleCreateUser}>Create New User</button>
+        <button class="bg-sky-500 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded" on:click={handleImportKey}>Import Existing Key</button>
+      </div>
     </div>
   {/if}
 
   {#if currentStep === 'userReady'}
-    <h2 class="text-xl font-semibold mb-4 text-center text-green-400">User Ready</h2>
-    <p class="text-center">Your keys are loaded and verified. You are ready to proceed.</p>
-    <!-- Add further actions for a ready user, e.g., export, sign data, etc. -->
-    <div class="mt-6 flex justify-center space-x-4">
-       <!-- Placeholder for future actions like "Export Key Again" or "Sign Out (Clear Keys)" -->
-       <button on:click={() => { currentStep = 'initial'; userPrivateKey = undefined; userPublicKey = undefined; console.log("Simulating sign out/reset"); alert("Keys cleared for demo. Refresh or re-create."); }}>Reset (Dev)</button>
+    <div class="bg-green-700 border border-green-600 text-green-100 px-4 py-3 rounded relative mb-6 text-center" role="alert">
+      <h2 class="text-xl font-bold mb-2">User Ready</h2>
+      <p class="text-sm">Your keys are loaded and verified. You are ready to proceed.</p>
+      <!-- Add further actions for a ready user, e.g., export, sign data, etc. -->
+      <div class="mt-6 flex justify-center space-x-4">
+         <!-- Placeholder for future actions like "Export Key Again" or "Sign Out (Clear Keys)" -->
+         <button class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" on:click={() => { currentStep = 'initial'; userPrivateKey = undefined; userPublicKey = undefined; console.log("Simulating sign out/reset"); alert("Keys cleared for demo. Refresh or re-create."); }}>Reset (Dev)</button>
+      </div>
     </div>
   {/if}
 
   {#if currentStep === 'error'}
-    <h2 class="text-xl font-semibold mb-4 text-center text-red-400">Authentication Error</h2>
-    <p class="text-center mb-4">{errorMessage || "An unexpected error occurred."}</p>
-    <div class="flex justify-center">
-      <button on:click={() => currentStep = 'initial'}>Try Again</button>
+    <div class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
+      <h2 class="text-2xl font-semibold mb-4 text-red-400">Authentication Error</h2>
+      <p class="text-gray-300 mb-4">{errorMessage || "An unexpected error occurred."}</p>
+      <div class="flex justify-center">
+        <button class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded" on:click={() => currentStep = 'initial'}>Try Again</button>
+      </div>
     </div>
   {/if}
 
   {#if currentStep === 'createUser'}
-    <p class="text-center">User Creation (Work In Progress)...</p>
-    <!-- User creation UI will go here -->
-     <button on:click={() => currentStep = 'initial'}>Back</button>
+    <div class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
+      <p class="text-gray-300 mb-4">User Creation (Work In Progress)...</p>
+      <!-- User creation UI will go here -->
+      <button class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mt-4" on:click={() => currentStep = 'initial'}>Back</button>
+    </div>
   {/if}
 
   {#if currentStep === 'importKey'}
-    <p class="text-center">Import Key (Work In Progress)...</p>
-    <!-- Key import UI will go here -->
-    <button on:click={() => currentStep = 'initial'}>Back</button>
+    <div class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
+      <p class="text-gray-300 mb-4">Import Key (Work In Progress)...</p>
+      <!-- Key import UI will go here -->
+      <button class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mt-4" on:click={() => currentStep = 'initial'}>Back</button>
+    </div>
   {/if}
 
 </div>
-
-<style>
-  /* Component-specific styles can go here, Tailwind is mostly used via classes */
-  button {
-    background-color: #4F46E5; /* indigo-600 */
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 0.25rem;
-    margin: 0.5rem;
-    border: none;
-    cursor: pointer;
-  }
-  button:hover {
-    background-color: #4338CA; /* indigo-700 */
-  }
-</style>
