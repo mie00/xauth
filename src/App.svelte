@@ -22,8 +22,5 @@
 </main>
 
 <style>
-  /* You can add component-specific styles here, or keep them global */
-</main> {
-    /* Example: ensure main takes full viewport if body doesn't enforce flex full height */
-  }
+
 </style>

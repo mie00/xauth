@@ -173,7 +173,7 @@ async function unwrapPrivateKeyWithPassword(
   const iv = base64ToArrayBuffer(payload.iv);
   const wrappedKeyBuffer = base64ToArrayBuffer(payload.cipherText);
 
-  const wrappingKey = await deriveKeyFromPassword(password, salt);
+  const wrappingKey = await deriveKeyFromPassword(password, new Uint8Array(salt));
 
   const unwrappedKeyAlgorithm: EcKeyImportParams | RsaHashedImportParams = payload.keyAlgorithmName === "ECDSA"
     ? { name: payload.keyAlgorithmName, namedCurve: payload.keyAlgorithmNamedCurve! }
@@ -236,58 +236,6 @@ function extractPublicKeyFromJWK(jwk: JsonWebKey): Uint8Array {
   uncompressedPoint.set(yBytes, 1 + coordLength);
 
   return uncompressedPoint;
-}
-
-/**
- * Simulates the process of creating a new user.
- * This function is a placeholder and does not perform actual user creation.
- * It introduces a delay to mimic an asynchronous operation.
- */
-async function createUser(): Promise<{
-  newPrivate: CryptoKey;
-  publicKey: CryptoKey;
-  exportedPrivateJwk: JsonWebKey;
-}> {
-  console.log("Attempting to create a new user (key generation)...");
-  // Generate an extractable private key first
-  const { privateKey: originalPrivateKey } = await window.crypto.subtle.generateKey(
-    {
-      name: "ECDSA",
-      namedCurve: "P-384",
-    },
-    true, // extractable = true, so we can get its JWK for QR code
-    ["sign", "verify"], // "verify" is often included, though "sign" is primary for private key
-  );
-  const exportedPrivateJwk = await window.crypto.subtle.exportKey("jwk", originalPrivateKey);
-
-  // Create the non-extractable private key for operational use and IndexedDB storage
-  const newPrivate = await window.crypto.subtle.importKey(
-    "jwk",
-    exportedPrivateJwk, // Import from the JWK of the extractable key
-    {
-      name: "ECDSA",
-      namedCurve: "P-384",
-    },
-    false, // extractable = false for the operational key
-    ["sign"],
-  );
-  console.log("Operational non-extractable private key:", newPrivate);
-  const uncompressedPoint = extractPublicKeyFromJWK(exportedPrivateJwk);
-
-  // 1. Import the uncompressedPoint as a public CryptoKey
-  const publicKey = await window.crypto.subtle.importKey(
-    "raw",
-    uncompressedPoint,
-    {
-      name: "ECDSA",
-      namedCurve: "P-384",
-    },
-    true, // public keys are always extractable
-    ["verify"],
-  );
-  console.log("Generated Public Key:", publicKey);
-
-  return { newPrivate, publicKey, exportedPrivateJwk };
 }
 
 async function importJwkAsKeys(jwk: JsonWebKey): Promise<{ importedPrivateKey: CryptoKey; importedPublicKey: CryptoKey }> {
@@ -548,18 +496,7 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
         if (importPasswordError) importPasswordError.textContent = `Decryption failed: ${decryptError.message || "Incorrect password or corrupted data."}`;
         // Do not clear scannedQrData here, allow user to retry password
           }
-        }
-      };
-      requestAnimationFrame(tick);
-
-    } catch (err: any) {
-      console.error("Error accessing camera or starting scanner:", err);
-      qrScannerMessage.textContent = `Error: ${err.message || "Could not access camera."} Check permissions.`;
-      stopCamera();
-      // Keep importKeySection visible to show the error
-      importKeySection.style.display = 'block';
-      if (createUserSection) createUserSection.style.display = 'none';
-    }
+        })
   }
 
   // Try to load keys from IndexedDB on initialization
