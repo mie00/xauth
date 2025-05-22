@@ -11,12 +11,12 @@
   import LoadingSpinner from './auth/LoadingSpinner.svelte';
   import ConfirmLoginStep from './auth/ConfirmLoginStep.svelte';
 
-  export let rawCallbackParam: string | null = null;
+  const {rawCallbackParam}:{rawCallbackParam: string | null} = $props();
 
   type LoginStep = 'loading' | 'awaitingConfirmation' | 'processingLogin' | 'error';
-  let currentStep: LoginStep = 'loading';
-  let errorMessage: string | null = null;
-  let parsedCallbackUrl: URL | null = null;
+  let currentStep: LoginStep = $state('loading');
+  let errorMessage: string | null = $state(null);
+  let parsedCallbackUrl: URL | null = $state(null);
 
   onMount(async () => {
     if (!rawCallbackParam) {
