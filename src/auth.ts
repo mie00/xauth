@@ -68,6 +68,8 @@ async function loadKey(keyName: string): Promise<CryptoKey | undefined> {
     };
   });
 }
+import QRCode from 'qrcode';
+
 // --- End IndexedDB Utilities ---
 
 // --- Empty functions as requested ---
@@ -120,30 +122,36 @@ function extractPublicKeyFromJWK(jwk: JsonWebKey): Uint8Array {
  * This function is a placeholder and does not perform actual user creation.
  * It introduces a delay to mimic an asynchronous operation.
  */
-async function createUser(): Promise<void> {
-  console.log("Attempting to create a new user (simulation)...");
-  // Simulate a delay (e.g., API call)
-  const { privateKey } = await window.crypto.subtle.generateKey(
+async function createUser(): Promise<{
+  newPrivate: CryptoKey;
+  publicKey: CryptoKey;
+  exportedPrivateJwk: JsonWebKey;
+}> {
+  console.log("Attempting to create a new user (key generation)...");
+  // Generate an extractable private key first
+  const { privateKey: originalPrivateKey } = await window.crypto.subtle.generateKey(
     {
       name: "ECDSA",
       namedCurve: "P-384",
     },
-    true,
-    ["sign", "verify"],
+    true, // extractable = true, so we can get its JWK for QR code
+    ["sign", "verify"], // "verify" is often included, though "sign" is primary for private key
   );
-  const exportedPrivate = await window.crypto.subtle.exportKey("jwk", privateKey);
+  const exportedPrivateJwk = await window.crypto.subtle.exportKey("jwk", originalPrivateKey);
+
+  // Create the non-extractable private key for operational use and IndexedDB storage
   const newPrivate = await window.crypto.subtle.importKey(
     "jwk",
-    exportedPrivate,
+    exportedPrivateJwk, // Import from the JWK of the extractable key
     {
       name: "ECDSA",
       namedCurve: "P-384",
     },
-    false,
+    false, // extractable = false for the operational key
     ["sign"],
   );
-  console.log(newPrivate);
-  const uncompressedPoint = extractPublicKeyFromJWK(exportedPrivate);
+  console.log("Operational non-extractable private key:", newPrivate);
+  const uncompressedPoint = extractPublicKeyFromJWK(exportedPrivateJwk);
 
   // 1. Import the uncompressedPoint as a public CryptoKey
   const publicKey = await window.crypto.subtle.importKey(
@@ -153,29 +161,12 @@ async function createUser(): Promise<void> {
       name: "ECDSA",
       namedCurve: "P-384",
     },
-    true,
+    true, // public keys are always extractable
     ["verify"],
   );
-  console.log("Imported Public Key:", publicKey);
+  console.log("Generated Public Key:", publicKey);
 
-  // Save keys to IndexedDB
-  try {
-    await saveKey(newPrivate, PRIVATE_KEY_NAME);
-    await saveKey(publicKey, PUBLIC_KEY_NAME);
-    console.log("Private and Public keys saved to IndexedDB during creation.");
-  } catch (error) {
-    console.error("Error saving keys to IndexedDB during creation:", error);
-    // Depending on the application's needs, this error might be surfaced to the user
-    // or handled in a way that allows the application to continue.
-  }
-
-  // Call signAndVerify with the newly created keys
-  // This demonstrates the keys work immediately after creation.
-  try {
-    await signAndVerify(newPrivate, publicKey);
-  } catch (e) {
-    console.error("Error during sign/verify immediately after key creation:", e);
-  }
+  return { newPrivate, publicKey, exportedPrivateJwk };
 }
 
 async function signAndVerify(newPrivate: CryptoKey, publicKey: CryptoKey): Promise<void> {
@@ -235,6 +226,11 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
   const userInfoSection = document.getElementById('userInfoSection') as HTMLDivElement | null;
   const createUserButton = document.getElementById('createUserButton') as HTMLButtonElement | null;
   const userInfoForm = document.getElementById('userInfoForm') as HTMLFormElement | null;
+  // New DOM elements for QR code section
+  const qrCodeSection = document.getElementById('qrCodeSection') as HTMLDivElement | null;
+  const qrCodeImage = document.getElementById('qrCodeImage') as HTMLImageElement | null;
+  const qrCodeSavedButton = document.getElementById('qrCodeSavedButton') as HTMLButtonElement | null;
+
 
   // Try to load keys from IndexedDB on initialization
   let userPrivateKey: CryptoKey | undefined;
@@ -296,26 +292,69 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
         if (loadingSection) loadingSection.style.display = 'block';
         if (userCreatedSection) userCreatedSection.style.display = 'none';
         if (userInfoSection) userInfoSection.style.display = 'none';
+        if (qrCodeSection) qrCodeSection.style.display = 'none';
+
 
         try {
-          await createUser(); // Call the empty function that simulates delay
+          const { newPrivate, publicKey, exportedPrivateJwk } = await createUser();
 
-          // Hide loading, show user created message
+          // Generate QR code from the exportedPrivateJwk
+          const qrDataUrl = await QRCode.toDataURL(JSON.stringify(exportedPrivateJwk), {
+            errorCorrectionLevel: 'M', // Medium error correction
+            margin: 2, // Margin around QR code
+            scale: 4, // Scale factor
+            color: {
+              dark: '#000000FF', // Black dots
+              light: '#FFFFFFFF', // White background
+            }
+          });
+          if (qrCodeImage) qrCodeImage.src = qrDataUrl;
+
+          // Hide loading, show QR code section
           if (loadingSection) loadingSection.style.display = 'none';
-          if (userCreatedSection) userCreatedSection.style.display = 'block';
+          if (qrCodeSection) qrCodeSection.style.display = 'block';
 
-          // After a brief moment, show the additional information form
-          setTimeout(() => {
-            if (userCreatedSection) userCreatedSection.style.display = 'none'; // Optionally hide the "user created" message
-            if (userInfoSection) userInfoSection.style.display = 'block';
-          }, 1500); // Show info form after 1.5 seconds
+          // Handle QR code saved confirmation
+          if (qrCodeSavedButton) {
+            qrCodeSavedButton.addEventListener('click', async () => {
+              if (qrCodeSection) qrCodeSection.style.display = 'none';
+              if (userCreatedSection) userCreatedSection.style.display = 'block';
+
+              // Save keys to IndexedDB
+              try {
+                await saveKey(newPrivate, PRIVATE_KEY_NAME);
+                await saveKey(publicKey, PUBLIC_KEY_NAME);
+                console.log("Private (non-extractable) and Public keys saved to IndexedDB after QR confirmation.");
+              } catch (saveError) {
+                console.error("Error saving keys to IndexedDB after QR confirmation:", saveError);
+                alert("Error saving keys. Please try again or contact support.");
+                if (userCreatedSection) userCreatedSection.style.display = 'none';
+                if (createUserSection) createUserSection.style.display = 'block'; // Allow to try again
+                return;
+              }
+
+              // Sign and verify with the newly stored keys
+              try {
+                await signAndVerify(newPrivate, publicKey);
+              } catch (signVerifyError) {
+                console.error("Error during sign/verify after QR confirmation:", signVerifyError);
+                // This might not be critical enough to stop the user flow if keys are saved,
+                // but it's important to log.
+              }
+
+              // After a brief moment, show the additional information form
+              setTimeout(() => {
+                if (userCreatedSection) userCreatedSection.style.display = 'none';
+                if (userInfoSection) userInfoSection.style.display = 'block';
+              }, 1500);
+            }, { once: true }); // Ensure this listener fires only once per button instance
+          }
 
         } catch (error) {
-          console.error("Error during user creation simulation:", error);
-          // Handle error: show error message, revert to initial state, etc.
+          console.error("Error during user creation or QR generation:", error);
           if (loadingSection) loadingSection.style.display = 'none';
-          if (createUserSection) createUserSection.style.display = 'block'; // Show create user section again
-          alert("Simulation failed: Could not create user.");
+          if (createUserSection) createUserSection.style.display = 'block';
+          alert("Failed to create user or generate QR code. Please try again.");
         }
       });
     }
