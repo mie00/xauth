@@ -1,3 +1,75 @@
+// --- IndexedDB Utilities ---
+const DB_NAME = "AuthDB";
+const STORE_NAME = "CryptoKeys";
+const PRIVATE_KEY_NAME = "userPrivateKey";
+const PUBLIC_KEY_NAME = "userPublicKey";
+
+async function openDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    request.onsuccess = (event) => {
+      resolve((event.target as IDBOpenDBRequest).result);
+    };
+    request.onerror = (event) => {
+      console.error("IndexedDB error opening database:", (event.target as IDBOpenDBRequest).error);
+      reject("Error opening IndexedDB");
+    };
+  });
+}
+
+async function saveKey(key: CryptoKey, keyName: string): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.put(key, keyName);
+    request.onsuccess = () => resolve();
+    request.onerror = (event) => {
+      console.error("Error saving key to IndexedDB:", (event.target as IDBRequest).error);
+      reject("Error saving key");
+    };
+    transaction.oncomplete = () => {
+      // console.log(`Transaction completed for saving key: ${keyName}`);
+      db.close();
+    };
+    transaction.onerror = (event) => {
+        console.error("Transaction error saving key to IndexedDB:", (event.target as IDBTransaction).error);
+        reject("Transaction error saving key");
+    };
+  });
+}
+
+async function loadKey(keyName: string): Promise<CryptoKey | undefined> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, "readonly");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.get(keyName);
+    request.onsuccess = (event) => {
+      resolve((event.target as IDBRequest).result as CryptoKey | undefined);
+    };
+    request.onerror = (event) => {
+      console.error("Error loading key from IndexedDB:", (event.target as IDBRequest).error);
+      reject("Error loading key");
+    };
+    transaction.oncomplete = () => {
+      // console.log(`Transaction completed for loading key: ${keyName}`);
+      db.close();
+    };
+    transaction.onerror = (event) => {
+        console.error("Transaction error loading key from IndexedDB:", (event.target as IDBTransaction).error);
+        reject("Transaction error loading key");
+    };
+  });
+}
+// --- End IndexedDB Utilities ---
+
 // --- Empty functions as requested ---
 
 function extractPublicKeyFromJWK(jwk: JsonWebKey): Uint8Array {
@@ -85,6 +157,25 @@ async function createUser(): Promise<void> {
     ["verify"],
   );
   console.log("Imported Public Key:", publicKey);
+
+  // Save keys to IndexedDB
+  try {
+    await saveKey(newPrivate, PRIVATE_KEY_NAME);
+    await saveKey(publicKey, PUBLIC_KEY_NAME);
+    console.log("Private and Public keys saved to IndexedDB during creation.");
+  } catch (error) {
+    console.error("Error saving keys to IndexedDB during creation:", error);
+    // Depending on the application's needs, this error might be surfaced to the user
+    // or handled in a way that allows the application to continue.
+  }
+
+  // Call signAndVerify with the newly created keys
+  // This demonstrates the keys work immediately after creation.
+  try {
+    await signAndVerify(newPrivate, publicKey);
+  } catch(e) {
+    console.error("Error during sign/verify immediately after key creation:", e);
+  }
 }
 
 async function signAndVerify(newPrivate: CryptoKey, publicKey: CryptoKey): Promise<void> {
@@ -136,7 +227,7 @@ function saveInformation(data: Record<string, string>): void {
 
 // --- End of empty functions ---
 
-export function initializeAuthFlow(): void {
+export async function initializeAuthFlow(): Promise<void> { // Make async
   // DOM Elements
   const createUserSection = document.getElementById('createUserSection') as HTMLDivElement | null;
   const loadingSection = document.getElementById('loadingSection') as HTMLDivElement | null;
@@ -145,10 +236,63 @@ export function initializeAuthFlow(): void {
   const createUserButton = document.getElementById('createUserButton') as HTMLButtonElement | null;
   const userInfoForm = document.getElementById('userInfoForm') as HTMLFormElement | null;
 
-  if (createUserButton) {
-    createUserButton.addEventListener('click', async () => {
-      // Hide create user section, show loading
-      if (createUserSection) createUserSection.style.display = 'none';
+  // Try to load keys from IndexedDB on initialization
+  let userPrivateKey: CryptoKey | undefined;
+  let userPublicKey: CryptoKey | undefined;
+
+  try {
+    userPrivateKey = await loadKey(PRIVATE_KEY_NAME);
+    userPublicKey = await loadKey(PUBLIC_KEY_NAME);
+  } catch (error) {
+    console.error("Error loading keys from IndexedDB on startup:", error);
+    // UI could inform the user that previously saved keys could not be loaded.
+  }
+
+  if (userPrivateKey && userPublicKey) {
+    console.log("User keys successfully loaded from IndexedDB.");
+    // Keys exist, adjust UI to reflect this (e.g., skip creation step)
+    if (createUserSection) createUserSection.style.display = 'none';
+    if (loadingSection) loadingSection.style.display = 'none';
+    if (userCreatedSection) userCreatedSection.style.display = 'block'; // Or a "Welcome back" message
+    if (userInfoSection) userInfoSection.style.display = 'none'; // Initially hide, will be shown by timeout
+
+    // Demonstrate that the loaded keys can be used for cryptographic operations
+    console.log("Attempting to sign and verify with loaded keys...");
+    try {
+      await signAndVerify(userPrivateKey, userPublicKey);
+      console.log("Sign and verify with loaded keys was successful.");
+    } catch (e) {
+      console.error("Error during sign/verify with loaded keys:", e);
+      // This could indicate corrupted keys or an issue with the IndexedDB data.
+      // Fallback: Show an error and allow the user to re-create keys.
+      if (userCreatedSection) userCreatedSection.style.display = 'none';
+      if (createUserSection) createUserSection.style.display = 'block';
+      alert("There was an error verifying your stored keys. You might need to create them again.");
+      // Optionally, you could attempt to clear the problematic keys from IndexedDB here.
+      // For example:
+      // Promise.all([deleteKey(PRIVATE_KEY_NAME), deleteKey(PUBLIC_KEY_NAME)])
+      //   .catch(delErr => console.error("Error deleting problematic keys:", delErr));
+    }
+
+    // After a brief moment, show the additional information form
+    setTimeout(() => {
+      if (userCreatedSection) userCreatedSection.style.display = 'none';
+      if (userInfoSection) userInfoSection.style.display = 'block';
+    }, 1500);
+
+  } else {
+    console.log("No keys found in IndexedDB or keys failed to load. User creation flow will be active.");
+    // No keys found, or loading failed. Ensure create user UI is visible.
+    if (createUserSection) createUserSection.style.display = 'block';
+    if (loadingSection) loadingSection.style.display = 'none';
+    if (userCreatedSection) userCreatedSection.style.display = 'none';
+    if (userInfoSection) userInfoSection.style.display = 'none';
+
+    // Setup the create user button listener only if keys were not loaded
+    if (createUserButton) {
+      createUserButton.addEventListener('click', async () => {
+        // Hide create user section, show loading
+        if (createUserSection) createUserSection.style.display = 'none';
       if (loadingSection) loadingSection.style.display = 'block';
       if (userCreatedSection) userCreatedSection.style.display = 'none';
       if (userInfoSection) userInfoSection.style.display = 'none';
