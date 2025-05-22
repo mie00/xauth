@@ -356,7 +356,7 @@
       <div class="relative w-full max-w-md mx-auto aspect-square bg-gray-700 rounded overflow-hidden mb-4">
         <!-- svelte-ignore a11y-media-has-caption -->
         <video bind:this={videoElement} class="w-full h-full object-cover" playsinline autoplay muted></video>
-        {#if !isScanning && !qrScanError}
+        {#if !isScanning && !qrScanError && !mediaStream}
           <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
             <p class="text-gray-200">Initializing camera...</p>
           </div>
@@ -380,8 +380,10 @@
   {#if currentStep === 'enterWrappedKeyForImport'}
     <div id="importKeyDataSection" class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
       <h2 class="text-2xl font-semibold mb-4 text-gray-100">Import Account Key</h2>
-      {#if wrappedKeyForImport}
+      {#if wrappedKeyForImport && !qrScanError}
       <p class="text-gray-300 mb-1">QR code data loaded. Now enter your password.</p>
+      {:else if qrScanError && currentStep === 'enterWrappedKeyForImport'}
+      <p class="text-gray-300 mb-1">Camera failed or not available. Paste your wrapped key data and enter password.</p>
       {:else}
       <p class="text-gray-300 mb-1">Paste your wrapped key data (JSON text from backup) and enter the password you used to encrypt it.</p>
       {/if}
@@ -390,7 +392,7 @@
         bind:value={wrappedKeyForImport}
         placeholder="Paste wrapped key JSON here, or it will appear after QR scan"
         class="w-full p-2 mb-4 bg-gray-700 text-gray-100 rounded border border-gray-600 focus:ring-indigo-500 focus:border-indigo-500 h-32"
-        readonly={currentStep === 'enterWrappedKeyForImport' && wrappedKeyForImport !== '' && previousStep === 'qrScanForImport'}
+        readonly={!!(wrappedKeyForImport && !qrScanError)}
       ></textarea>
       <input
         type="password"
@@ -409,7 +411,7 @@
         >
           Import Account
         </button>
-        <button class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" on:click={() => { currentStep = 'initial'; errorMessage = null; wrappedKeyForImport = ''; passwordInput = ''; }}>Back</button>
+        <button class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" on:click={() => { currentStep = 'initial'; errorMessage = null; wrappedKeyForImport = ''; passwordInput = ''; qrScanError = null; }}>Back</button>
       </div>
     </div>
   {/if}
