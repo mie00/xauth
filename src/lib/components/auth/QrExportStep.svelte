@@ -1,17 +1,6 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  export let qrCodeImageDataUrl: string | null;
-  export let wrappedKeyForExport: string | null;
-
-  const dispatch = createEventDispatcher();
-
-  function handleDone() {
-    dispatch('done');
-  }
-
-  function handleBackToStart() {
-    dispatch('backtostart');
-  }
+  const { qrCodeImageDataUrl, wrappedKeyForExport, ondone, onbacktostart }: 
+    { qrCodeImageDataUrl: string | null, wrappedKeyForExport: string | null, ondone: () => void, onbacktostart: () => void } = $props();
 </script>
 
 <div id="qrExportSection" class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
@@ -30,9 +19,9 @@
     placeholder="Wrapped key data will appear here..."
   ></textarea>
   <div class="mt-6 flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:space-x-4 justify-center">
-    <button class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded" on:click={handleDone}>
+    <button class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded" onclick={ondone}>
       Done, I've Saved My Key
     </button>
-     <button class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" on:click={handleBackToStart}>Back to Start (Key is Saved)</button>
+     <button class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" onclick={onbacktostart}>Back to Start (Key is Saved)</button>
   </div>
 </div>

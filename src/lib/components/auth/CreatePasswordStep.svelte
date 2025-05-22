@@ -1,17 +1,16 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  export let passwordInput: string = ''; // Bound from parent
-  export let errorMessage: string | null = null; // For displaying errors specific to this step
+  let { 
+    passwordInput = $bindable(''), 
+    errorMessage = null,
+    onsubmit,
+    onback
+  }: {
+    passwordInput: string,
+    errorMessage: string | null,
+    onsubmit: () => void,
+    onback: () => void
+  } = $props();
 
-  const dispatch = createEventDispatcher();
-
-  function handleSubmit() {
-    dispatch('submit'); // Parent's passwordInput is already updated due to binding
-  }
-
-  function handleBack() {
-    dispatch('back');
-  }
 </script>
 
 <div id="enterPasswordCreateSection" class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
@@ -29,11 +28,11 @@
   <div class="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:space-x-4 justify-center">
     <button
       class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded"
-      on:click={handleSubmit}
+      onclick={onsubmit}
       disabled={!passwordInput}
     >
       Create Account & Get QR Key
     </button>
-    <button class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" on:click={handleBack}>Back</button>
+    <button class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" onclick={onback}>Back</button>
   </div>
 </div>

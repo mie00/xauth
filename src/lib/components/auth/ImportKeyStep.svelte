@@ -1,22 +1,22 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  let { 
+    wrappedKeyForImport = $bindable(''), 
+    passwordInput = $bindable(''), 
+    errorMessage = null, 
+    qrScanErrorMessage = null, 
+    qrDataLoaded = false,
+    onsubmit,
+    onback
+  }: {
+    wrappedKeyForImport: string,
+    passwordInput: string,
+    errorMessage: string | null,
+    qrScanErrorMessage: string | null,
+    qrDataLoaded: boolean,
+    onsubmit: () => void,
+    onback: () => void
+  } = $props();
 
-  export let wrappedKeyForImport: string = ''; // Bound from parent
-  export let passwordInput: string = ''; // Bound from parent
-  export let errorMessage: string | null = null; 
-  export let qrScanErrorMessage: string | null = null; 
-  export let qrDataLoaded: boolean = false; 
-
-  const dispatch = createEventDispatcher();
-
-  function handleSubmit() {
-    // Parent's values are already updated due to binding
-    dispatch('submit');
-  }
-
-  function handleBack() {
-    dispatch('back');
-  }
 </script>
 
 <div id="importKeyDataSection" class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
@@ -47,11 +47,11 @@
   <div class="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:space-x-4 justify-center">
     <button
       class="bg-sky-500 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded"
-      on:click={handleSubmit}
+      onclick={onsubmit}
       disabled={!passwordInput || !wrappedKeyForImport}
     >
       Import Account
     </button>
-    <button class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" on:click={handleBack}>Back</button>
+    <button class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" onclick={onback}>Back</button>
   </div>
 </div>

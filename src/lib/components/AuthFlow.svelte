@@ -28,16 +28,16 @@
     | 'enterWrappedKeyForImport'
     | 'error';
 
-  let currentStep: AuthStep = 'loading';
-  let errorMessage: string | null = null;
-  let userPrivateKey: CryptoKey | undefined;
-  let userPublicKey: CryptoKey | undefined;
+  let currentStep: AuthStep = $state('loading');
+  let errorMessage: string | null = $state(null);
+  let userPrivateKey: CryptoKey | undefined = $state(undefined);
+  let userPublicKey: CryptoKey | undefined = $state(undefined);
 
-  let passwordInput: string = '';
-  let wrappedKeyForExport: string | null = null;
-  let qrCodeImageDataUrl: string | null = null;
-  let wrappedKeyForImport: string = '';
-  let qrMessageForImportStep: string | null = null; // For messages from QR scan flow to ImportKeyStep
+  let passwordInput: string = $state('');
+  let wrappedKeyForExport: string | null = $state(null);
+  let qrCodeImageDataUrl: string | null = $state(null);
+  let wrappedKeyForImport: string = $state('');
+  let qrMessageForImportStep: string | null = $state(null); // For messages from QR scan flow to ImportKeyStep
 
   onMount(async () => {
     currentStep = 'loading';
@@ -172,7 +172,7 @@
   {/if}
 
   {#if currentStep === 'initial'}
-    <InitialStep on:create={handleCreateUser} on:import={handleImportKey} />
+    <InitialStep oncreate={handleCreateUser} onimport={handleImportKey} />
   {/if}
 
   {#if currentStep === 'userReady'}
@@ -180,30 +180,30 @@
   {/if}
 
   {#if currentStep === 'error'}
-    <ErrorStep {errorMessage} on:tryagain={resetToInitial} />
+    <ErrorStep errorMessage={errorMessage} ontryagain={resetToInitial} />
   {/if}
 
   {#if currentStep === 'enterPasswordForCreate'}
     <CreatePasswordStep 
       bind:passwordInput 
       errorMessage={errorMessage}
-      on:submit={initiateUserCreationProcess} 
-      on:back={resetToInitial} 
+      onsubmit={initiateUserCreationProcess} 
+      onback={resetToInitial} 
     />
   {/if}
 
   {#if currentStep === 'qrExport'}
     <QrExportStep 
-      {qrCodeImageDataUrl} 
-      {wrappedKeyForExport} 
-      on:done={() => currentStep = 'userReady'} 
-      on:backtostart={resetToInitial} 
+      qrCodeImageDataUrl={qrCodeImageDataUrl} 
+      wrappedKeyForExport={wrappedKeyForExport} 
+      ondone={() => currentStep = 'userReady'} 
+      onbacktostart={resetToInitial} 
     />
   {/if}
 
   {#if currentStep === 'qrScanForImport'}
     <QrScanStep
-      on:scanned={(event) => {
+      onscanned={(event) => {
         wrappedKeyForImport = event.detail;
         passwordInput = ''; 
         errorMessage = null; 
@@ -211,20 +211,20 @@
         currentStep = 'enterWrappedKeyForImport';
         console.log("QR scanned, transitioning to enterWrappedKeyForImport");
       }}
-      on:scanError={(event) => {
+      onscanerror={(event) => {
         qrMessageForImportStep = event.detail;
         errorMessage = null; // Clear general error, qrMessageForImportStep will show specific scan error
         currentStep = 'enterWrappedKeyForImport';
         console.log("QR scan error, transitioning to enterWrappedKeyForImport");
       }}
-      on:manualinput={() => {
+      onmanualinput={() => {
         qrMessageForImportStep = qrMessageForImportStep || "Switched to manual input.";
         errorMessage = null;
         passwordInput = '';
         currentStep = 'enterWrappedKeyForImport';
         console.log("Switched to manual input, transitioning to enterWrappedKeyForImport");
       }}
-      on:back={resetToInitial}
+      onback={resetToInitial}
     />
   {/if}
 
@@ -235,8 +235,8 @@
       errorMessage={errorMessage}
       qrScanErrorMessage={qrMessageForImportStep}
       qrDataLoaded={!!(wrappedKeyForImport && !qrMessageForImportStep)}
-      on:submit={initiateUserImportProcess}
-      on:back={() => {
+      onsubmit={initiateUserImportProcess}
+      onback={() => {
         resetToInitial();
         currentStep = 'initial'; // Go back to initial options
       }} 

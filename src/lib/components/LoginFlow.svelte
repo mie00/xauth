@@ -119,7 +119,7 @@
   {/if}
 
   {#if currentStep === 'awaitingConfirmation' && parsedCallbackUrl}
-    <ConfirmLoginStep callbackUrl={parsedCallbackUrl.toString()} on:confirm={handleConfirm} on:cancel={handleCancel} />
+    <ConfirmLoginStep callbackUrl={parsedCallbackUrl.toString()} onconfirm={handleConfirm} oncancel={handleCancel} />
   {/if}
 
   {#if currentStep === 'processingLogin'}
