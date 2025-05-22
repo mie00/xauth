@@ -7,7 +7,6 @@
     unwrapAndImportKeysFromPayload 
   } from '../../auth';
   import QRCode from 'qrcode';
-  import jsQR from 'jsqr';
 
   // Import new child components
   import LoadingSpinner from './auth/LoadingSpinner.svelte';
@@ -38,13 +37,7 @@
   let wrappedKeyForExport: string | null = null;
   let qrCodeImageDataUrl: string | null = null;
   let wrappedKeyForImport: string = '';
-
-  let videoElement: HTMLVideoElement | null = null;
-  let canvasElement: HTMLCanvasElement | null = null;
-  let qrScanError: string | null = null;
-  let isScanning: boolean = false;
-  let animationFrameId: number | null = null;
-  let mediaStream: MediaStream | null = null;
+  let qrMessageForImportStep: string | null = null; // For messages from QR scan flow to ImportKeyStep
 
   onMount(async () => {
     currentStep = 'loading';
@@ -117,85 +110,14 @@
   function handleImportKey() {
     passwordInput = '';
     wrappedKeyForImport = '';
-    qrScanError = null;
+    qrMessageForImportStep = null;
     errorMessage = null;
     currentStep = 'qrScanForImport';
     console.log("Transitioning to qrScanForImport step");
-    startQrScan();
-  }
-
-  async function startQrScan() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      qrScanError = "getUserMedia() not supported by your browser.";
-      console.error(qrScanError);
-      currentStep = 'enterWrappedKeyForImport';
-      return;
-    }
-    isScanning = true;
-    qrScanError = null;
-    try {
-      mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-      if (videoElement && mediaStream) {
-        videoElement.srcObject = mediaStream;
-        videoElement.setAttribute("playsinline", "true");
-        await videoElement.play();
-        tick();
-      }
-    } catch (err: any) {
-      console.error("Error accessing camera for QR scan:", err);
-      qrScanError = `Could not access camera: ${err.name} - ${err.message}. Try manual input.`;
-      stopQrScan();
-      currentStep = 'enterWrappedKeyForImport';
-    }
-  }
-
-  function stopQrScan() {
-    isScanning = false;
-    if (animationFrameId) {
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
-    }
-    if (mediaStream) {
-      mediaStream.getTracks().forEach(track => track.stop());
-      mediaStream = null;
-    }
-    if (videoElement) {
-      videoElement.srcObject = null;
-    }
-    console.log("QR Scanner stopped.");
-  }
-
-  function tick() {
-    if (!isScanning || !videoElement || !canvasElement || videoElement.readyState !== videoElement.HAVE_ENOUGH_DATA) {
-      if (isScanning) animationFrameId = requestAnimationFrame(tick);
-      return;
-    }
-    const canvas = canvasElement.getContext('2d', { willReadFrequently: true });
-    if (canvas) {
-      canvasElement.height = videoElement.videoHeight;
-      canvasElement.width = videoElement.videoWidth;
-      canvas.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
-      const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: "dontInvert",
-      });
-      if (code && code.data) {
-        console.log("QR Code detected:", code.data);
-        wrappedKeyForImport = code.data;
-        stopQrScan();
-        passwordInput = ''; // Clear password for import step
-        errorMessage = null; // Clear any previous general errors
-        currentStep = 'enterWrappedKeyForImport';
-      } else {
-        animationFrameId = requestAnimationFrame(tick);
-      }
-    } else {
-      animationFrameId = requestAnimationFrame(tick);
-    }
   }
 
   onDestroy(() => {
-    stopQrScan();
+    // QR Scan cleanup is now handled by QrScanStep's own onDestroy
   });
 
   async function initiateUserImportProcess() {
@@ -234,12 +156,12 @@
   function resetToInitial() {
     currentStep = 'initial';
     errorMessage = null;
-    qrScanError = null;
+    qrMessageForImportStep = null;
     passwordInput = '';
     wrappedKeyForImport = '';
     wrappedKeyForExport = null;
     qrCodeImageDataUrl = null;
-    stopQrScan(); // Ensure scanner is stopped if active
+    // QR Scan cleanup is now handled by QrScanStep's own onDestroy
   }
 
 </script>
@@ -280,31 +202,40 @@
   {/if}
 
   {#if currentStep === 'qrScanForImport'}
-    <QrScanStep 
-      bind:videoElement 
-      bind:canvasElement 
-      qrScanError={qrScanError}
-      isScanning={isScanning}
-      mediaStreamActive={!!mediaStream}
-      on:manualinput={() => { 
-        stopQrScan(); 
-        currentStep = 'enterWrappedKeyForImport'; 
-        qrScanError = qrScanError || "Switched to manual input."; // Keep existing error or set a new one
-        errorMessage = null; // Clear general error message
-        passwordInput = ''; // Clear password for import step
-      }} 
-      on:back={resetToInitial} 
+    <QrScanStep
+      on:scanned={(event) => {
+        wrappedKeyForImport = event.detail;
+        passwordInput = ''; 
+        errorMessage = null; 
+        qrMessageForImportStep = null;
+        currentStep = 'enterWrappedKeyForImport';
+        console.log("QR scanned, transitioning to enterWrappedKeyForImport");
+      }}
+      on:scanError={(event) => {
+        qrMessageForImportStep = event.detail;
+        errorMessage = null; // Clear general error, qrMessageForImportStep will show specific scan error
+        currentStep = 'enterWrappedKeyForImport';
+        console.log("QR scan error, transitioning to enterWrappedKeyForImport");
+      }}
+      on:manualinput={() => {
+        qrMessageForImportStep = qrMessageForImportStep || "Switched to manual input.";
+        errorMessage = null;
+        passwordInput = '';
+        currentStep = 'enterWrappedKeyForImport';
+        console.log("Switched to manual input, transitioning to enterWrappedKeyForImport");
+      }}
+      on:back={resetToInitial}
     />
   {/if}
 
   {#if currentStep === 'enterWrappedKeyForImport'}
-    <ImportKeyStep 
-      bind:wrappedKeyForImport 
+    <ImportKeyStep
+      bind:wrappedKeyForImport
       bind:passwordInput
-      errorMessage={errorMessage} 
-      qrScanErrorMessage={qrScanError}
-      qrDataLoaded={!!(wrappedKeyForImport && !qrScanError)}
-      on:submit={initiateUserImportProcess} 
+      errorMessage={errorMessage}
+      qrScanErrorMessage={qrMessageForImportStep}
+      qrDataLoaded={!!(wrappedKeyForImport && !qrMessageForImportStep)}
+      on:submit={initiateUserImportProcess}
       on:back={() => {
         resetToInitial();
         currentStep = 'initial'; // Go back to initial options
