@@ -4,8 +4,8 @@
 </script>
 
 <main class="p-8 flex flex-col justify-center items-center min-h-screen bg-gray-900 text-gray-100">
-  <div class="container p-4 max-w-lg w-full">
-    <h1 class="text-3xl font-bold text-indigo-400 mb-6 text-center">
+  <div class="container p-4 max-w-md w-full flex flex-col items-center">
+    <h1 class="text-2xl font-semibold text-gray-100 mb-6 text-center">
       Client-Side Authentication Demo
     </h1>
     <AuthFlow />

@@ -11,7 +11,7 @@
   let userPublicKey: CryptoKey | undefined;
 
   onMount(async () => {
-    console.log("AuthFlow component mounted. Checking for existing keys...");
+    // console.log("AuthFlow component mounted. Checking for existing keys..."); // Quieter log
     currentStep = 'loading';
     errorMessage = null;
     try {
