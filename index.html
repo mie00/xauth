@@ -24,12 +24,25 @@
       <div id="importKeySection" style="display: none;" class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
         <h2 class="text-2xl font-semibold mb-4 text-gray-100">Import Account by QR Code</h2>
         <p class="text-gray-300 mb-2">Point your camera at the QR code containing your account key.</p>
-        <div class="relative w-full max-w-xs mx-auto mb-4 aspect-square bg-gray-700 rounded overflow-hidden">
-          <video id="qrScannerVideo" playsinline class="absolute top-0 left-0 w-full h-full object-cover"></video>
-          <canvas id="qrScannerCanvas" class="hidden absolute top-0 left-0 w-full h-full"></canvas> <!-- For jsQR processing, can be hidden -->
+        <div id="qrVideoScannerDiv">
+          <div class="relative w-full max-w-xs mx-auto mb-4 aspect-square bg-gray-700 rounded overflow-hidden">
+            <video id="qrScannerVideo" playsinline class="absolute top-0 left-0 w-full h-full object-cover"></video>
+            <canvas id="qrScannerCanvas" class="hidden absolute top-0 left-0 w-full h-full"></canvas> <!-- For jsQR processing, can be hidden -->
+          </div>
+          <p id="qrScannerMessage" class="text-red-400 text-sm mb-4 h-6"></p> <!-- For errors or status -->
         </div>
-        <p id="qrScannerMessage" class="text-red-400 text-sm mb-4 h-6"></p> <!-- For errors or status -->
-        <button id="cancelImportButton" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+        <div id="passwordForImportDiv" style="display: none;">
+          <p class="text-gray-300 mb-2">QR code scanned. Enter the password to decrypt your account key.</p>
+          <div class="mb-4">
+            <label for="importPassword" class="block text-gray-300 text-sm font-bold mb-2">Password:</label>
+            <input type="password" id="importPassword" name="importPassword" class="shadow appearance-none border border-gray-600 bg-gray-700 rounded w-full py-2 px-3 text-gray-100 leading-tight focus:outline-none focus:shadow-outline placeholder-gray-400">
+          </div>
+          <p id="importPasswordError" class="text-red-400 text-sm mb-4 h-6"></p>
+          <button id="decryptKeyButton" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+            Decrypt and Import Key
+          </button>
+        </div>
+        <button id="cancelImportButton" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mt-4">
           Cancel Import
         </button>
       </div>
@@ -47,13 +60,30 @@
       </div>
 
       <div id="qrCodeSection" style="display: none;" class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
-        <h2 class="text-2xl font-semibold mb-4 text-gray-100">Save Your Account Key</h2>
-        <p class="text-gray-300 mb-2">Scan and save the QR code below in a secure place.</p>
-        <p class="text-red-400 text-sm mb-4">This is your **private** account recovery key. Treat it like a password. You will need it to re-import your account if you lose access.</p>
-        <img id="qrCodeImage" src="" alt="Account Recovery QR Code" class="mx-auto mb-4 border-4 border-gray-600 rounded p-1 bg-white"/>
-        <button id="qrCodeSavedButton" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
-          I have saved my QR Code
-        </button>
+        <h2 class="text-2xl font-semibold mb-4 text-gray-100">Secure & Save Your Account Key</h2>
+        <div id="passwordForExportDiv">
+          <p class="text-gray-300 mb-2">Create a strong password to encrypt your account key before saving it.</p>
+          <div class="mb-4">
+            <label for="exportPassword" class="block text-gray-300 text-sm font-bold mb-2">Password:</label>
+            <input type="password" id="exportPassword" name="exportPassword" class="shadow appearance-none border border-gray-600 bg-gray-700 rounded w-full py-2 px-3 text-gray-100 leading-tight focus:outline-none focus:shadow-outline placeholder-gray-400">
+          </div>
+          <div class="mb-6">
+            <label for="confirmExportPassword" class="block text-gray-300 text-sm font-bold mb-2">Confirm Password:</label>
+            <input type="password" id="confirmExportPassword" name="confirmExportPassword" class="shadow appearance-none border border-gray-600 bg-gray-700 rounded w-full py-2 px-3 text-gray-100 mb-3 leading-tight focus:outline-none focus:shadow-outline placeholder-gray-400">
+          </div>
+          <p id="exportPasswordError" class="text-red-400 text-sm mb-4 h-6"></p>
+          <button id="confirmPasswordAndGenerateQRButton" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mb-4">
+            Confirm Password & Generate QR
+          </button>
+        </div>
+        <div id="qrDisplayDiv" style="display: none;">
+          <p class="text-gray-300 mb-2">Scan and save the QR code below in a secure place. You will need this QR code AND your password to re-import your account.</p>
+          <p class="text-red-400 text-sm mb-4">This QR code contains your **encrypted private** account recovery key.</p>
+          <img id="qrCodeImage" src="" alt="Account Recovery QR Code" class="mx-auto mb-4 border-4 border-gray-600 rounded p-1 bg-white"/>
+          <button id="qrCodeSavedButton" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+            I have saved my QR Code & Password
+          </button>
+        </div>
       </div>
 
     </div>

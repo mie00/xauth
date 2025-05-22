@@ -73,6 +73,126 @@ import jsQR from 'jsqr';
 
 // --- End IndexedDB Utilities ---
 
+// --- Cryptographic Helper Functions for Wrapping/Unwrapping ---
+
+const PBKDF2_ITERATIONS = 100000; // Number of iterations for PBKDF2
+const AES_KEY_ALGORITHM = { name: "AES-GCM", length: 256 };
+const WRAPPING_ALGORITHM = { name: "AES-GCM" }; // IV will be generated per wrap
+
+// Helper to convert ArrayBuffer to Base64 string
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+}
+
+// Helper to convert Base64 string to ArrayBuffer
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binary_string = window.atob(base64);
+  const len = binary_string.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary_string.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+
+async function deriveKeyFromPassword(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  const passwordBuffer = new TextEncoder().encode(password);
+  const baseKey = await window.crypto.subtle.importKey(
+    "raw",
+    passwordBuffer,
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"]
+  );
+
+  return window.crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: salt,
+      iterations: PBKDF2_ITERATIONS,
+      hash: "SHA-256",
+    },
+    baseKey,
+    AES_KEY_ALGORITHM,
+    true, // The derived key needs to be extractable: false, usages: ['wrapKey', 'unwrapKey']
+    ["wrapKey", "unwrapKey"]
+  );
+}
+
+interface WrappedKeyPayload {
+  salt: string; // base64
+  iv: string;   // base64
+  cipherText: string; // base64 of wrapped key (ArrayBuffer)
+  keyAlgorithmName: string;
+  keyAlgorithmNamedCurve?: string;
+  keyExtractable: boolean;
+  keyUsages: KeyUsage[];
+}
+
+async function wrapPrivateKeyWithPassword(
+  privateKeyToWrap: CryptoKey, // This is the extractable private key
+  password: string
+): Promise<WrappedKeyPayload> {
+  const salt = window.crypto.getRandomValues(new Uint8Array(16));
+  const wrappingKey = await deriveKeyFromPassword(password, salt);
+  const iv = window.crypto.getRandomValues(new Uint8Array(12)); // AES-GCM recommended IV size
+
+  const wrappedKeyBuffer = await window.crypto.subtle.wrapKey(
+    "jwk", // Format of the key to be wrapped
+    privateKeyToWrap,
+    wrappingKey,
+    { ...WRAPPING_ALGORITHM, iv: iv } // AES-GCM parameters
+  );
+
+  // Get metadata from the key being wrapped
+  const jwk = await window.crypto.subtle.exportKey("jwk", privateKeyToWrap);
+
+  return {
+    salt: arrayBufferToBase64(salt),
+    iv: arrayBufferToBase64(iv),
+    cipherText: arrayBufferToBase64(wrappedKeyBuffer),
+    keyAlgorithmName: jwk.kty === "EC" ? "ECDSA" : jwk.kty || "Unknown", // Assuming EC or other kty
+    keyAlgorithmNamedCurve: jwk.crv,
+    keyExtractable: privateKeyToWrap.extractable, // Should be true
+    keyUsages: privateKeyToWrap.usages, // e.g. ["sign", "verify"]
+  };
+}
+
+async function unwrapPrivateKeyWithPassword(
+  payload: WrappedKeyPayload,
+  password: string
+): Promise<CryptoKey> { // Returns the unwrapped (original, extractable) private key
+  const salt = base64ToArrayBuffer(payload.salt);
+  const iv = base64ToArrayBuffer(payload.iv);
+  const wrappedKeyBuffer = base64ToArrayBuffer(payload.cipherText);
+
+  const wrappingKey = await deriveKeyFromPassword(password, salt);
+
+  const unwrappedKeyAlgorithm: EcKeyImportParams | RsaHashedImportParams = payload.keyAlgorithmName === "ECDSA"
+    ? { name: payload.keyAlgorithmName, namedCurve: payload.keyAlgorithmNamedCurve! }
+    : { name: payload.keyAlgorithmName, hash: {name: "SHA-256"} }; // Adjust if other key types are used
+
+  return window.crypto.subtle.unwrapKey(
+    "jwk", // Format of the wrapped key
+    wrappedKeyBuffer,
+    wrappingKey,
+    { ...WRAPPING_ALGORITHM, iv: iv }, // AES-GCM parameters
+    unwrappedKeyAlgorithm, // Algorithm of the key being unwrapped
+    payload.keyExtractable, // Should be true to re-export as JWK
+    payload.keyUsages // Usages of the key being unwrapped
+  );
+}
+
+// --- End Cryptographic Helper Functions ---
+
+
 // --- Empty functions as requested ---
 
 function extractPublicKeyFromJWK(jwk: JsonWebKey): Uint8Array {
@@ -254,6 +374,14 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
   const qrCodeSection = document.getElementById('qrCodeSection') as HTMLDivElement | null;
   const qrCodeImage = document.getElementById('qrCodeImage') as HTMLImageElement | null;
   const qrCodeSavedButton = document.getElementById('qrCodeSavedButton') as HTMLButtonElement | null;
+  // Export password elements
+  const passwordForExportDiv = document.getElementById('passwordForExportDiv') as HTMLDivElement | null;
+  const exportPasswordInput = document.getElementById('exportPassword') as HTMLInputElement | null;
+  const confirmExportPasswordInput = document.getElementById('confirmExportPassword') as HTMLInputElement | null;
+  const exportPasswordError = document.getElementById('exportPasswordError') as HTMLParagraphElement | null;
+  const confirmPasswordAndGenerateQRButton = document.getElementById('confirmPasswordAndGenerateQRButton') as HTMLButtonElement | null;
+  const qrDisplayDiv = document.getElementById('qrDisplayDiv') as HTMLDivElement | null;
+
   // New DOM elements for QR import
   const importKeyButton = document.getElementById('importKeyButton') as HTMLButtonElement | null;
   const importKeySection = document.getElementById('importKeySection') as HTMLDivElement | null;
@@ -261,8 +389,16 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
   const qrScannerCanvas = document.getElementById('qrScannerCanvas') as HTMLCanvasElement | null;
   const qrScannerMessage = document.getElementById('qrScannerMessage') as HTMLParagraphElement | null;
   const cancelImportButton = document.getElementById('cancelImportButton') as HTMLButtonElement | null;
+  // Import password elements
+  const qrVideoScannerDiv = document.getElementById('qrVideoScannerDiv') as HTMLDivElement | null;
+  const passwordForImportDiv = document.getElementById('passwordForImportDiv') as HTMLDivElement | null;
+  const importPasswordInput = document.getElementById('importPassword') as HTMLInputElement | null;
+  const importPasswordError = document.getElementById('importPasswordError') as HTMLParagraphElement | null;
+  const decryptKeyButton = document.getElementById('decryptKeyButton') as HTMLButtonElement | null;
+
 
   let currentVideoStream: MediaStream | null = null;
+  let scannedQrData: WrappedKeyPayload | null = null; // To store scanned QR data before password input
 
   function stopCamera() {
     if (currentVideoStream) {
@@ -276,8 +412,8 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
     }
   }
 
-  async function handleImportKeyProcess() {
-    if (!importKeySection || !qrScannerVideo || !qrScannerCanvas || !qrScannerMessage || !loadingSection || !createUserSection || !userCreatedSection /* || !userInfoSection - removed */) {
+  async function handleImportKeyProcess() { // This function now initiates scanning OR decryption
+    if (!importKeySection || !qrVideoScannerDiv || !passwordForImportDiv || !qrScannerVideo || !qrScannerCanvas || !qrScannerMessage || !loadingSection || !createUserSection || !userCreatedSection || !importPasswordInput || !decryptKeyButton || !importPasswordError) {
       console.error("One or more UI elements for import are missing.");
       return;
     }
@@ -286,13 +422,19 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
     if (createUserSection) createUserSection.style.display = 'none';
     if (loadingSection) loadingSection.style.display = 'none';
     importKeySection.style.display = 'block';
+    qrVideoScannerDiv.style.display = 'block'; // Show scanner first
+    passwordForImportDiv.style.display = 'none'; // Hide password input initially
     qrScannerMessage.textContent = 'Requesting camera access...';
+    importPasswordError.textContent = '';
+
 
     try {
       currentVideoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      if (!qrScannerVideo) throw new Error("QR Scanner video element not found after getUserMedia");
       qrScannerVideo.srcObject = currentVideoStream;
-      await qrScannerVideo.play(); // Ensure play() is awaited or handled as a promise
+      await qrScannerVideo.play();
 
+      if (!qrScannerCanvas) throw new Error("QR Scanner canvas element not found");
       const canvasContext = qrScannerCanvas.getContext('2d', { willReadFrequently: true });
       if (!canvasContext) {
         throw new Error("Could not get canvas context for QR scanning.");
@@ -316,36 +458,95 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
 
         if (code && code.data) {
           stopCamera();
-          qrScannerMessage.textContent = 'QR code detected. Processing...';
-          importKeySection.style.display = 'none';
-          if (loadingSection) loadingSection.style.display = 'block';
+          qrScannerMessage.textContent = 'QR code detected. Enter password to decrypt.';
+          if (qrVideoScannerDiv) qrVideoScannerDiv.style.display = 'none';
+          if (passwordForImportDiv) passwordForImportDiv.style.display = 'block';
+          if (importPasswordInput) importPasswordInput.value = ''; // Clear previous attempts
+          if (importPasswordError) importPasswordError.textContent = '';
 
-          setTimeout(async () => { // Introduce a small delay for UI to update
-            try {
-              const jwk = JSON.parse(code.data) as JsonWebKey;
-              const { importedPrivateKey, importedPublicKey } = await importJwkAsKeys(jwk);
-
-              await saveKey(importedPrivateKey, PRIVATE_KEY_NAME);
-              await saveKey(importedPublicKey, PUBLIC_KEY_NAME);
-              console.log("Keys imported from QR and saved to IndexedDB.");
-
-              await signAndVerify(importedPrivateKey, importedPublicKey);
-
-              if (loadingSection) loadingSection.style.display = 'none';
-              if (userCreatedSection) userCreatedSection.style.display = 'block'; // Show success message and keep it
-              // No longer transitioning to userInfoSection
-
-            } catch (importError: any) {
-              console.error("Error processing QR code or importing keys:", importError);
-              stopCamera();
-              if (loadingSection) loadingSection.style.display = 'none';
-              importKeySection.style.display = 'block';
-              qrScannerMessage.textContent = `Error: ${importError.message || "Could not import key."} Cancel and try again.`;
+          try {
+            scannedQrData = JSON.parse(code.data) as WrappedKeyPayload;
+            // Basic validation of scanned data structure
+            if (!scannedQrData || !scannedQrData.salt || !scannedQrData.iv || !scannedQrData.cipherText || !scannedQrData.keyAlgorithmName || !scannedQrData.keyUsages) {
+                throw new Error("Invalid QR code data structure.");
             }
-          }, 100); // Small delay for UI transition
+          } catch (parseError: any) {
+            console.error("Error parsing QR code data:", parseError);
+            if (importKeySection) importKeySection.style.display = 'block'; // Keep import section visible
+            if (qrVideoScannerDiv) qrVideoScannerDiv.style.display = 'block'; // Show scanner again
+            if (passwordForImportDiv) passwordForImportDiv.style.display = 'none';
+            if (qrScannerMessage) qrScannerMessage.textContent = `Error: Invalid QR code format. ${parseError.message || ""}`;
+            scannedQrData = null;
+            return; // Stop processing
+          }
+          // Now wait for user to enter password and click "Decrypt Key"
+          // The event listener for decryptKeyButton will handle the rest.
+
         } else {
-          if (currentVideoStream) {
+          if (currentVideoStream) { // Only continue if stream is active
               requestAnimationFrame(tick);
+          }
+        }
+      };
+      requestAnimationFrame(tick);
+
+    } catch (err: any) {
+      console.error("Error accessing camera or starting scanner:", err);
+      if (qrScannerMessage) qrScannerMessage.textContent = `Error: ${err.message || "Could not access camera."} Check permissions.`;
+      stopCamera();
+      // Keep importKeySection visible to show the error, but ensure scanner part is shown if appropriate
+      if (importKeySection) importKeySection.style.display = 'block';
+      if (qrVideoScannerDiv) qrVideoScannerDiv.style.display = 'block';
+      if (passwordForImportDiv) passwordForImportDiv.style.display = 'none';
+      if (createUserSection) createUserSection.style.display = 'none';
+    }
+  }
+
+
+  if (decryptKeyButton) {
+    decryptKeyButton.addEventListener('click', async () => {
+      if (!scannedQrData || !importPasswordInput || !loadingSection || !userCreatedSection || !importKeySection || !importPasswordError) {
+        console.error("Missing data or elements for decryption.");
+        if (importPasswordError) importPasswordError.textContent = "Internal error. Please cancel and retry.";
+        return;
+      }
+      const password = importPasswordInput.value;
+      if (!password) {
+        importPasswordError.textContent = "Password cannot be empty.";
+        return;
+      }
+      importPasswordError.textContent = ""; // Clear previous errors
+
+      if (importKeySection) importKeySection.style.display = 'none'; // Hide import section (password input)
+      if (loadingSection) loadingSection.style.display = 'block';
+
+      try {
+        const unwrappedPrivateKey = await unwrapPrivateKeyWithPassword(scannedQrData, password);
+        // The unwrappedPrivateKey is the original extractable private key.
+        // Now, convert it to JWK and then import it as non-extractable for operational use.
+        const unwrappedJwk = await window.crypto.subtle.exportKey("jwk", unwrappedPrivateKey);
+
+        const { importedPrivateKey, importedPublicKey } = await importJwkAsKeys(unwrappedJwk);
+
+        await saveKey(importedPrivateKey, PRIVATE_KEY_NAME);
+        await saveKey(importedPublicKey, PUBLIC_KEY_NAME);
+        console.log("Keys imported from QR, decrypted, and saved to IndexedDB.");
+
+        await signAndVerify(importedPrivateKey, importedPublicKey);
+
+        if (loadingSection) loadingSection.style.display = 'none';
+        if (userCreatedSection) userCreatedSection.style.display = 'block';
+        scannedQrData = null; // Clear stored QR data
+        if (importPasswordInput) importPasswordInput.value = '';
+
+
+      } catch (decryptError: any) {
+        console.error("Error decrypting or processing key:", decryptError);
+        if (loadingSection) loadingSection.style.display = 'none';
+        if (importKeySection) importKeySection.style.display = 'block'; // Show import section again
+        if (passwordForImportDiv) passwordForImportDiv.style.display = 'block'; // Show password input again
+        if (importPasswordError) importPasswordError.textContent = `Decryption failed: ${decryptError.message || "Incorrect password or corrupted data."}`;
+        // Do not clear scannedQrData here, allow user to retry password
           }
         }
       };
@@ -419,68 +620,97 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
         if (loadingSection) loadingSection.style.display = 'block';
         if (userCreatedSection) userCreatedSection.style.display = 'none';
         // if (userInfoSection) userInfoSection.style.display = 'none'; // Removed
-        if (qrCodeSection) qrCodeSection.style.display = 'none'; // This is for showing the QR to save
-        if (importKeySection) importKeySection.style.display = 'none'; // Hide import section if it was somehow visible
+        if (qrCodeSection) qrCodeSection.style.display = 'none';
+        if (importKeySection) importKeySection.style.display = 'none';
+        if (passwordForExportDiv) passwordForExportDiv.style.display = 'block'; // Show password input first
+        if (qrDisplayDiv) qrDisplayDiv.style.display = 'none'; // Hide QR display initially
+        if (exportPasswordError) exportPasswordError.textContent = '';
+        if (exportPasswordInput) exportPasswordInput.value = '';
+        if (confirmExportPasswordInput) confirmExportPasswordInput.value = '';
 
 
         try {
-          // Key creation logic remains the same, leading to QR display for backup
-          const { newPrivate, publicKey, exportedPrivateJwk } = await createUser();
+          // Step 1: Generate the extractable private key (originalPrivateKey)
+          // The createUser() function already returns `exportedPrivateJwk` which is from an extractable key.
+          // We need the actual CryptoKey object that is extractable.
+          const { privateKey: originalExtractablePrivateKey } = await window.crypto.subtle.generateKey(
+            { name: "ECDSA", namedCurve: "P-384" }, true, ["sign", "verify"]
+          );
 
-          // Generate QR code from the exportedPrivateJwk for backup
-          const qrDataUrl = await QRCode.toDataURL(JSON.stringify(exportedPrivateJwk), {
-            errorCorrectionLevel: 'M', // Medium error correction
-            margin: 2, // Margin around QR code
-            scale: 4, // Scale factor
-            color: {
-              dark: '#000000FF', // Black dots
-              light: '#FFFFFFFF', // White background
-            }
-          });
-          if (qrCodeImage) qrCodeImage.src = qrDataUrl;
-
-          // Hide loading, show QR code section
+          // Hide loading, show QR code section (which now starts with password input)
           if (loadingSection) loadingSection.style.display = 'none';
           if (qrCodeSection) qrCodeSection.style.display = 'block';
 
-          // Handle QR code saved confirmation
+
+          if (confirmPasswordAndGenerateQRButton) {
+            confirmPasswordAndGenerateQRButton.onclick = async () => { // Use .onclick to easily replace if needed
+              if (!exportPasswordInput || !confirmExportPasswordInput || !exportPasswordError || !qrCodeImage || !passwordForExportDiv || !qrDisplayDiv || !loadingSection) return;
+
+              const password = exportPasswordInput.value;
+              const confirmPassword = confirmExportPasswordInput.value;
+
+              if (!password || !confirmPassword) {
+                exportPasswordError.textContent = "Both password fields are required.";
+                return;
+              }
+              if (password !== confirmPassword) {
+                exportPasswordError.textContent = "Passwords do not match.";
+                return;
+              }
+              exportPasswordError.textContent = "";
+              passwordForExportDiv.style.display = 'none'; // Hide password inputs
+              loadingSection.style.display = 'block'; // Show loading while wrapping
+
+              try {
+                const wrappedPayload = await wrapPrivateKeyWithPassword(originalExtractablePrivateKey, password);
+                const qrDataUrl = await QRCode.toDataURL(JSON.stringify(wrappedPayload), {
+                  errorCorrectionLevel: 'M', margin: 2, scale: 4,
+                  color: { dark: '#000000FF', light: '#FFFFFFFF' }
+                });
+                qrCodeImage.src = qrDataUrl;
+                loadingSection.style.display = 'none';
+                qrDisplayDiv.style.display = 'block'; // Show QR code and save button
+
+              } catch (wrapError: any) {
+                console.error("Error wrapping key or generating QR:", wrapError);
+                loadingSection.style.display = 'none';
+                passwordForExportDiv.style.display = 'block'; // Show password inputs again
+                exportPasswordError.textContent = `Error: ${wrapError.message || "Could not generate QR."}`;
+              }
+            };
+          }
+
           if (qrCodeSavedButton) {
-            qrCodeSavedButton.addEventListener('click', async () => {
+            qrCodeSavedButton.onclick = async () => { // Use .onclick
               if (qrCodeSection) qrCodeSection.style.display = 'none';
               if (userCreatedSection) userCreatedSection.style.display = 'block';
 
-              // Save keys to IndexedDB
+              // Now, create the non-extractable key for operational use from originalExtractablePrivateKey
+              // and save it.
               try {
-                await saveKey(newPrivate, PRIVATE_KEY_NAME);
-                await saveKey(publicKey, PUBLIC_KEY_NAME);
-                console.log("Private (non-extractable) and Public keys saved to IndexedDB after QR confirmation.");
-              } catch (saveError) {
-                console.error("Error saving keys to IndexedDB after QR confirmation:", saveError);
+                const jwk = await window.crypto.subtle.exportKey("jwk", originalExtractablePrivateKey);
+                const { importedPrivateKey: operationalPrivateKey, importedPublicKey } = await importJwkAsKeys(jwk);
+                // importJwkAsKeys creates a non-extractable private key.
+
+                await saveKey(operationalPrivateKey, PRIVATE_KEY_NAME);
+                await saveKey(importedPublicKey, PUBLIC_KEY_NAME);
+                console.log("Operational keys saved to IndexedDB after QR confirmation.");
+
+                await signAndVerify(operationalPrivateKey, importedPublicKey);
+              } catch (saveError: any) {
+                console.error("Error saving operational keys to IndexedDB:", saveError);
                 alert("Error saving keys. Please try again or contact support.");
                 if (userCreatedSection) userCreatedSection.style.display = 'none';
-                if (createUserSection) createUserSection.style.display = 'block'; // Allow to try again
-                return;
+                if (createUserSection) createUserSection.style.display = 'block';
               }
-
-              // Sign and verify with the newly stored keys
-              try {
-                await signAndVerify(newPrivate, publicKey);
-              } catch (signVerifyError) {
-                console.error("Error during sign/verify after QR confirmation:", signVerifyError);
-                // This might not be critical enough to stop the user flow if keys are saved,
-                // but it's important to log.
-              }
-
-              // The userCreatedSection is already visible from the click handler.
-              // No timeout or transition to another section is needed.
-            }, { once: true }); // Ensure this listener fires only once per button instance
+            };
           }
 
         } catch (error) {
-          console.error("Error during user creation or QR generation:", error);
+          console.error("Error during initial key generation for export:", error);
           if (loadingSection) loadingSection.style.display = 'none';
           if (createUserSection) createUserSection.style.display = 'block';
-          alert("Failed to create user or generate QR code. Please try again.");
+          alert("Failed to initialize key creation. Please try again.");
         }
       });
     }
@@ -496,8 +726,11 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
     if (cancelImportButton) {
       cancelImportButton.addEventListener('click', () => {
         stopCamera();
+        scannedQrData = null; // Clear any scanned data
         if (importKeySection) importKeySection.style.display = 'none';
         if (qrScannerMessage) qrScannerMessage.textContent = '';
+        if (importPasswordInput) importPasswordInput.value = '';
+        if (importPasswordError) importPasswordError.textContent = '';
         if (createUserSection) createUserSection.style.display = 'block'; // Show initial choice section
         if (loadingSection) loadingSection.style.display = 'none';
       });
