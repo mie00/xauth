@@ -1,5 +1,4 @@
 <script lang="ts">
-<script lang="ts">
   import { onMount } from 'svelte';
   import { PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, loadKey } from '../indexedDB';
   import { signAndVerify } from '../../auth'; // We'll keep other auth functions in auth.ts for now
