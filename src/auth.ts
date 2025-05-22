@@ -39,8 +39,8 @@ async function saveKey(key: CryptoKey, keyName: string): Promise<void> {
       db.close();
     };
     transaction.onerror = (event) => {
-        console.error("Transaction error saving key to IndexedDB:", (event.target as IDBTransaction).error);
-        reject("Transaction error saving key");
+      console.error("Transaction error saving key to IndexedDB:", (event.target as IDBTransaction).error);
+      reject("Transaction error saving key");
     };
   });
 }
@@ -63,8 +63,8 @@ async function loadKey(keyName: string): Promise<CryptoKey | undefined> {
       db.close();
     };
     transaction.onerror = (event) => {
-        console.error("Transaction error loading key from IndexedDB:", (event.target as IDBTransaction).error);
-        reject("Transaction error loading key");
+      console.error("Transaction error loading key from IndexedDB:", (event.target as IDBTransaction).error);
+      reject("Transaction error loading key");
     };
   });
 }
@@ -173,7 +173,7 @@ async function createUser(): Promise<void> {
   // This demonstrates the keys work immediately after creation.
   try {
     await signAndVerify(newPrivate, publicKey);
-  } catch(e) {
+  } catch (e) {
     console.error("Error during sign/verify immediately after key creation:", e);
   }
 }
@@ -293,53 +293,54 @@ export async function initializeAuthFlow(): Promise<void> { // Make async
       createUserButton.addEventListener('click', async () => {
         // Hide create user section, show loading
         if (createUserSection) createUserSection.style.display = 'none';
-      if (loadingSection) loadingSection.style.display = 'block';
-      if (userCreatedSection) userCreatedSection.style.display = 'none';
-      if (userInfoSection) userInfoSection.style.display = 'none';
+        if (loadingSection) loadingSection.style.display = 'block';
+        if (userCreatedSection) userCreatedSection.style.display = 'none';
+        if (userInfoSection) userInfoSection.style.display = 'none';
 
-      try {
-        await createUser(); // Call the empty function that simulates delay
+        try {
+          await createUser(); // Call the empty function that simulates delay
 
-        // Hide loading, show user created message
-        if (loadingSection) loadingSection.style.display = 'none';
-        if (userCreatedSection) userCreatedSection.style.display = 'block';
+          // Hide loading, show user created message
+          if (loadingSection) loadingSection.style.display = 'none';
+          if (userCreatedSection) userCreatedSection.style.display = 'block';
 
-        // After a brief moment, show the additional information form
-        setTimeout(() => {
-          if (userCreatedSection) userCreatedSection.style.display = 'none'; // Optionally hide the "user created" message
-          if (userInfoSection) userInfoSection.style.display = 'block';
-        }, 1500); // Show info form after 1.5 seconds
+          // After a brief moment, show the additional information form
+          setTimeout(() => {
+            if (userCreatedSection) userCreatedSection.style.display = 'none'; // Optionally hide the "user created" message
+            if (userInfoSection) userInfoSection.style.display = 'block';
+          }, 1500); // Show info form after 1.5 seconds
 
-      } catch (error) {
-        console.error("Error during user creation simulation:", error);
-        // Handle error: show error message, revert to initial state, etc.
-        if (loadingSection) loadingSection.style.display = 'none';
-        if (createUserSection) createUserSection.style.display = 'block'; // Show create user section again
-        alert("Simulation failed: Could not create user.");
-      }
-    });
-  }
-
-  if (userInfoForm) {
-    userInfoForm.addEventListener('submit', (event: SubmitEvent) => {
-      event.preventDefault(); // Prevent default form submission
-
-      const formData = new FormData(userInfoForm);
-      const data: Record<string, string> = {};
-      formData.forEach((value, key) => {
-        if (typeof value === 'string') {
-          data[key] = value;
+        } catch (error) {
+          console.error("Error during user creation simulation:", error);
+          // Handle error: show error message, revert to initial state, etc.
+          if (loadingSection) loadingSection.style.display = 'none';
+          if (createUserSection) createUserSection.style.display = 'block'; // Show create user section again
+          alert("Simulation failed: Could not create user.");
         }
       });
+    }
 
-      saveInformation(data); // Call the empty function
+    if (userInfoForm) {
+      userInfoForm.addEventListener('submit', (event: SubmitEvent) => {
+        event.preventDefault(); // Prevent default form submission
 
-      alert("Information 'saved' (simulation - check console).");
+        const formData = new FormData(userInfoForm);
+        const data: Record<string, string> = {};
+        formData.forEach((value, key) => {
+          if (typeof value === 'string') {
+            data[key] = value;
+          }
+        });
 
-      // Optionally, reset the form and UI
-      userInfoForm.reset();
-      if (userInfoSection) userInfoSection.style.display = 'none';
-      if (createUserSection) createUserSection.style.display = 'block'; // Go back to initial state
-    });
+        saveInformation(data); // Call the empty function
+
+        alert("Information 'saved' (simulation - check console).");
+
+        // Optionally, reset the form and UI
+        userInfoForm.reset();
+        if (userInfoSection) userInfoSection.style.display = 'none';
+        if (createUserSection) createUserSection.style.display = 'block'; // Go back to initial state
+      });
+    }
   }
 }
