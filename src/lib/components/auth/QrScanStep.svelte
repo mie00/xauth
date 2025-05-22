@@ -118,7 +118,7 @@
   <h2 class="text-2xl font-semibold mb-4 text-gray-100">Scan QR Code to Import Key</h2>
   <p class="text-gray-300 mb-4">Point your camera at the QR code containing your encrypted account key.</p>
   <div class="relative w-full max-w-md mx-auto aspect-square bg-gray-700 rounded overflow-hidden mb-4">
-    <!-- svelte-ignore a11y-media-has-caption -->
+    <!-- svelte-ignore a11y_media_has_caption -->
     <video bind:this={videoElement} class="w-full h-full object-cover" playsinline autoplay muted></video>
     {#if !internalIsScanning && !internalQrScanError && !internalMediaStream}
       <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">

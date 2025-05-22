@@ -7,15 +7,15 @@
 
   type ViewState = 'loading' | 'authFlow' | 'loginFlow';
 
-  let currentView: ViewState = 'loading';
-  let rawCallbackParamForLoginFlow: string | null = null;
+  let currentView: ViewState = $state('loading');
+  let rawCallbackParam: string | null = $state(null);
 
   onMount(async () => {
     const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
 
     if (path === '/login') {
-      rawCallbackParamForLoginFlow = params.get('callback');
+      rawCallbackParam = params.get('callback');
       currentView = 'loginFlow';
     } else {
       currentView = 'authFlow';
@@ -28,7 +28,7 @@
     <LoadingSpinner />
     <p class="mt-4 text-center text-gray-600">Initializing...</p>
   {:else if currentView === 'loginFlow'}
-    <LoginFlow {rawCallbackParamForLoginFlow} />
+    <LoginFlow {rawCallbackParam} />
   {:else if currentView === 'authFlow'}
     <AuthFlow />
   {/if}

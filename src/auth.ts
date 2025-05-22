@@ -371,7 +371,3 @@ export async function signAndVerify(newPrivate: CryptoKey, publicKey: CryptoKey)
     console.error("Signature verification failed.");
   }
 }
-
-// --- End of empty functions ---
-// initializeAuthFlow function has been removed as its logic is migrated to AuthFlow.svelte
-export type { LoginTokenPayload }; // Exporting the type

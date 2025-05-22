@@ -203,16 +203,16 @@
 
   {#if currentStep === 'qrScanForImport'}
     <QrScanStep
-      onscanned={(event) => {
-        wrappedKeyForImport = event.detail;
+      onscanned={(key) => {
+        wrappedKeyForImport = key;
         passwordInput = ''; 
         errorMessage = null; 
         qrMessageForImportStep = null;
         currentStep = 'enterWrappedKeyForImport';
         console.log("QR scanned, transitioning to enterWrappedKeyForImport");
       }}
-      onscanerror={(event) => {
-        qrMessageForImportStep = event.detail;
+      onscanerror={(error) => {
+        qrMessageForImportStep = error;
         errorMessage = null; // Clear general error, qrMessageForImportStep will show specific scan error
         currentStep = 'enterWrappedKeyForImport';
         console.log("QR scan error, transitioning to enterWrappedKeyForImport");
