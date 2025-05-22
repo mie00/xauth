@@ -1,7 +1,11 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, loadKey, saveKey } from '../indexedDB';
-  import { signAndVerify, wrapPrivateKeyWithPassword, unwrapPrivateKeyWithPassword, importJwkAsKeys } from '../../auth';
+  import { 
+    signAndVerify, 
+    generateUserKeysAndWrappedPayload, 
+    unwrapAndImportKeysFromPayload 
+  } from '../../auth';
   import QRCode from 'qrcode';
   import jsQR from 'jsqr';
 
@@ -85,32 +89,14 @@
     currentStep = 'loading'; // Show loading indicator during key generation
     errorMessage = null;
     try {
-      const keyPair = await window.crypto.subtle.generateKey(
-        { name: "ECDSA", namedCurve: "P-384" },
-        true, // private key needs to be extractable for wrapping
-        ["sign", "verify"] // private key usage
-      ) as CryptoKeyPair;
+      const { operationalPrivateKey, publicKey, wrappedKeyJSON } = 
+        await generateUserKeysAndWrappedPayload(passwordInput);
 
-      const extractablePrivateKey = keyPair.privateKey;
-      const generatedPublicKey = keyPair.publicKey;
-
-      // Wrap the extractable private key for backup/QR
-      const wrappedPayload = await wrapPrivateKeyWithPassword(extractablePrivateKey, passwordInput);
-      wrappedKeyForExport = JSON.stringify(wrappedPayload, null, 2); // Pretty print JSON
+      wrappedKeyForExport = wrappedKeyJSON;
       qrCodeImageDataUrl = await QRCode.toDataURL(wrappedKeyForExport);
 
-      // Create a non-extractable version of the private key for operational use
-      const jwkPrivate = await window.crypto.subtle.exportKey("jwk", extractablePrivateKey);
-      
-      // Store the non-extractable private key and the public key
-      userPrivateKey = await window.crypto.subtle.importKey(
-        "jwk",
-        jwkPrivate,
-        { name: "ECDSA", namedCurve: "P-384" },
-        false, // NON-EXTRACTABLE
-        ["sign"]
-      );
-      userPublicKey = generatedPublicKey;
+      userPrivateKey = operationalPrivateKey;
+      userPublicKey = publicKey;
 
       await saveKey(userPrivateKey, PRIVATE_KEY_NAME);
       await saveKey(userPublicKey, PUBLIC_KEY_NAME);
@@ -222,15 +208,8 @@
     currentStep = 'loading';
     errorMessage = null;
     try {
-      const payload = JSON.parse(wrappedKeyForImport);
-      const unwrappedExtractablePrivateKey = await unwrapPrivateKeyWithPassword(payload, passwordInput);
-
-      // Convert this CryptoKey (which is extractable) into a JWK
-      // so we can use importJwkAsKeys to get the non-extractable private key and its public key.
-      const privateJwk = await window.crypto.subtle.exportKey("jwk", unwrappedExtractablePrivateKey);
-
-      // importJwkAsKeys will create a non-extractable private key and its public key
-      const { importedPrivateKey, importedPublicKey } = await importJwkAsKeys(privateJwk);
+      const { importedPrivateKey, importedPublicKey } = 
+        await unwrapAndImportKeysFromPayload(wrappedKeyForImport, passwordInput);
 
       userPrivateKey = importedPrivateKey;
       userPublicKey = importedPublicKey;

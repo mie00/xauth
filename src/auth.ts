@@ -117,8 +117,60 @@ export async function unwrapPrivateKeyWithPassword(
 
 // --- End Cryptographic Helper Functions ---
 
+export async function generateUserKeysAndWrappedPayload(password: string): Promise<{
+  operationalPrivateKey: CryptoKey; // Non-extractable
+  publicKey: CryptoKey;
+  wrappedKeyJSON: string;
+}> {
+  // 1. Generate extractable key pair
+  const keyPair = await window.crypto.subtle.generateKey(
+    { name: "ECDSA", namedCurve: "P-384" },
+    true, // private key needs to be extractable for wrapping
+    ["sign", "verify"] // Usages for the extractable private key
+  ) as CryptoKeyPair;
 
-// --- Empty functions as requested ---
+  const extractablePrivateKey = keyPair.privateKey;
+  const generatedPublicKey = keyPair.publicKey;
+
+  // 2. Wrap the extractable private key
+  const wrappedPayload = await wrapPrivateKeyWithPassword(extractablePrivateKey, password);
+  const wrappedKeyJSON = JSON.stringify(wrappedPayload, null, 2);
+
+  // 3. Create a non-extractable version of the private key for operational use
+  const jwkPrivate = await window.crypto.subtle.exportKey("jwk", extractablePrivateKey);
+  
+  // Import the JWK as a non-extractable private key
+  const operationalPrivateKey = await window.crypto.subtle.importKey(
+    "jwk",
+    jwkPrivate, // The JWK of the private key
+    { name: "ECDSA", namedCurve: "P-384" },
+    false, // NON-EXTRACTABLE
+    ["sign"] // Only "sign" usage for the operational private key
+  );
+
+  return {
+    operationalPrivateKey,
+    publicKey: generatedPublicKey,
+    wrappedKeyJSON,
+  };
+}
+
+export async function unwrapAndImportKeysFromPayload(
+  wrappedKeyJSON: string,
+  password: string
+): Promise<{ importedPrivateKey: CryptoKey; importedPublicKey: CryptoKey }> {
+  const payload = JSON.parse(wrappedKeyJSON);
+  const unwrappedExtractablePrivateKey = await unwrapPrivateKeyWithPassword(payload, password);
+
+  // Convert this CryptoKey (which is extractable) into a JWK
+  const privateJwk = await window.crypto.subtle.exportKey("jwk", unwrappedExtractablePrivateKey);
+
+  // importJwkAsKeys will create a non-extractable private key and its public key
+  return importJwkAsKeys(privateJwk);
+}
+
+
+// --- Key Management and Utility Functions ---
 
 function extractPublicKeyFromJWK(jwk: JsonWebKey): Uint8Array {
   const base64urlToBytes = (str: string): Uint8Array =>
