@@ -35,6 +35,13 @@
         return;
       }
 
+      // Check if the site is HTTPS, then callback must also be HTTPS
+      if (window.location.protocol === 'https:' && parsedCallbackUrl.protocol !== 'https:') {
+        errorMessage = "Invalid 'callback' URL: When this site is accessed via HTTPS, the callback URL must also use HTTPS.";
+        currentStep = 'error';
+        return;
+      }
+
     } catch (e) {
       errorMessage = "Invalid 'callback' URL format. Please provide a full, valid URL (e.g., https://example.com/path).";
       currentStep = 'error';
