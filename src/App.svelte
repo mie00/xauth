@@ -1,26 +1,20 @@
 <script lang="ts">
-  import "./style.css"; // Ensure global styles are applied if not handled globally in main.ts for Svelte
-                       // Or, if main.ts imports it, this might be redundant or for component-specific styles.
-                       // For now, let's keep it here to ensure Tailwind is active within Svelte context.
-                       // Typically, global styles are imported once in main.ts or App.svelte.
-
-  let name: string = 'Svelte 5 User';
+  import "./style.css"; // Global styles
+  import AuthFlow from './lib/components/AuthFlow.svelte';
 </script>
 
-<main class="p-8 flex flex-col justify-center items-center min-h-screen">
-  <div class="container p-4 max-w-md flex flex-col items-center text-center">
-    <h1 class="text-3xl font-bold text-indigo-400 mb-6">
-      Welcome, {name}!
+<main class="p-8 flex flex-col justify-center items-center min-h-screen bg-gray-900 text-gray-100">
+  <div class="container p-4 max-w-lg w-full"> {/* Adjusted max-width and added w-full for better layout */}
+    <h1 class="text-3xl font-bold text-indigo-400 mb-6 text-center">
+      Client-Side Authentication Demo
     </h1>
-    <p class="text-gray-300">
-      Your Svelte 5 application is ready.
-    </p>
-    <p class="text-gray-400 mt-4 text-sm">
-      Next steps: Migrate UI and authentication logic into Svelte components.
-    </p>
+    <AuthFlow />
   </div>
 </main>
 
 <style>
-
+  /* Ensure main takes full height if not already by global styles */
+  main {
+    min-height: 100vh;
+  }
 </style>
