@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { PUBLIC_KEY_NAME, PRIVATE_KEY_NAME, loadKey, saveKey } from '../indexedDB';
   import { signAndVerify, wrapPrivateKeyWithPassword, unwrapPrivateKeyWithPassword, importJwkAsKeys } from '../../auth';
   import QRCode from 'qrcode';
+  import jsQR from 'jsqr';
 
   type AuthStep =
     | 'initial'
@@ -10,7 +11,8 @@
     | 'userReady'
     | 'enterPasswordForCreate' // Renamed from createUser
     | 'qrExport' // Will be used to display QR code after creation
-    | 'enterWrappedKeyForImport' // Renamed from importKey
+    | 'qrScanForImport' // New step for QR code scanning
+    | 'enterWrappedKeyForImport' // For manual input or after QR scan
     | 'error';
 
   let currentStep: AuthStep = 'loading'; // Start in loading state
@@ -23,6 +25,15 @@
   let wrappedKeyForExport: string | null = null; // JSON string of WrappedKeyPayload for QR
   let qrCodeImageDataUrl: string | null = null; // Data URL for QR code image
   let wrappedKeyForImport: string = ''; // Textarea input for importing key
+
+  // State for QR Scanner
+  let videoElement: HTMLVideoElement | null = null;
+  let canvasElement: HTMLCanvasElement | null = null;
+  let qrScanError: string | null = null;
+  let isScanning: boolean = false;
+  let animationFrameId: number | null = null;
+  let mediaStream: MediaStream | null = null;
+
 
   onMount(async () => {
     // console.log("AuthFlow component mounted. Checking for existing keys..."); // Quieter log
@@ -116,11 +127,90 @@
   }
 
   function handleImportKey() {
-    passwordInput = ''; // Clear previous input
-    wrappedKeyForImport = ''; // Clear previous input
-    currentStep = 'enterWrappedKeyForImport';
-    console.log("Transitioning to enterWrappedKeyForImport step");
+    passwordInput = '';
+    wrappedKeyForImport = '';
+    qrScanError = null;
+    currentStep = 'qrScanForImport';
+    console.log("Transitioning to qrScanForImport step");
+    startQrScan();
   }
+
+  async function startQrScan() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      qrScanError = "getUserMedia() not supported by your browser.";
+      console.error(qrScanError);
+      currentStep = 'enterWrappedKeyForImport'; // Fallback to manual input
+      return;
+    }
+
+    isScanning = true;
+    qrScanError = null;
+
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      if (videoElement && mediaStream) {
+        videoElement.srcObject = mediaStream;
+        videoElement.setAttribute("playsinline", "true"); // Required for iOS Safari
+        await videoElement.play();
+        tick(); // Start scanning loop
+      }
+    } catch (err: any) {
+      console.error("Error accessing camera for QR scan:", err);
+      qrScanError = `Could not access camera: ${err.name} - ${err.message}. Try manual input.`;
+      stopQrScan(); // Ensure resources are released
+      currentStep = 'enterWrappedKeyForImport'; // Fallback to manual input
+    }
+  }
+
+  function stopQrScan() {
+    isScanning = false;
+    if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
+    }
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(track => track.stop());
+      mediaStream = null;
+    }
+    if (videoElement) {
+      videoElement.srcObject = null;
+    }
+    console.log("QR Scanner stopped.");
+  }
+
+  function tick() {
+    if (!isScanning || !videoElement || !canvasElement || videoElement.readyState !== videoElement.HAVE_ENOUGH_DATA) {
+      if (isScanning) animationFrameId = requestAnimationFrame(tick); // Retry if not ready but still scanning
+      return;
+    }
+
+    const canvas = canvasElement.getContext('2d', { willReadFrequently: true });
+    if (canvas) {
+      canvasElement.height = videoElement.videoHeight;
+      canvasElement.width = videoElement.videoWidth;
+      canvas.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+      const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: "dontInvert",
+      });
+
+      if (code && code.data) {
+        console.log("QR Code detected:", code.data);
+        wrappedKeyForImport = code.data;
+        stopQrScan();
+        currentStep = 'enterWrappedKeyForImport'; // Move to password entry with pre-filled data
+        // Potentially auto-focus password field here
+      } else {
+        animationFrameId = requestAnimationFrame(tick);
+      }
+    } else {
+      animationFrameId = requestAnimationFrame(tick); // Retry if canvas context not ready
+    }
+  }
+
+  onDestroy(() => {
+    stopQrScan(); // Ensure camera is released when component is destroyed
+  });
 
   async function initiateUserImportProcess() {
     if (!passwordInput || !wrappedKeyForImport) {
@@ -259,14 +349,48 @@
     </div>
   {/if}
 
+  {#if currentStep === 'qrScanForImport'}
+    <div id="qrScanImportSection" class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
+      <h2 class="text-2xl font-semibold mb-4 text-gray-100">Scan QR Code to Import Key</h2>
+      <p class="text-gray-300 mb-4">Point your camera at the QR code containing your encrypted account key.</p>
+      <div class="relative w-full max-w-md mx-auto aspect-square bg-gray-700 rounded overflow-hidden mb-4">
+        <!-- svelte-ignore a11y-media-has-caption -->
+        <video bind:this={videoElement} class="w-full h-full object-cover" playsinline autoplay muted></video>
+        {#if !isScanning && !qrScanError}
+          <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
+            <p class="text-gray-200">Initializing camera...</p>
+          </div>
+        {/if}
+      </div>
+      <canvas bind:this={canvasElement} class="hidden"></canvas> {#if qrScanError}
+        <p class="text-red-400 mb-4">{qrScanError}</p>
+      {/if}
+      <div class="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:space-x-4 justify-center">
+        <button
+          class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded"
+          on:click={() => { stopQrScan(); currentStep = 'enterWrappedKeyForImport'; qrScanError = null; }}
+        >
+          Switch to Manual Input
+        </button>
+        <button class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" on:click={() => { stopQrScan(); currentStep = 'initial'; qrScanError = null; errorMessage = null; }}>Back</button>
+      </div>
+    </div>
+  {/if}
+
   {#if currentStep === 'enterWrappedKeyForImport'}
     <div id="importKeyDataSection" class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
       <h2 class="text-2xl font-semibold mb-4 text-gray-100">Import Account Key</h2>
-      <p class="text-gray-300 mb-4">Paste your wrapped key data (JSON text from QR code/backup) and enter the password you used to encrypt it.</p>
+      {#if wrappedKeyForImport}
+      <p class="text-gray-300 mb-1">QR code data loaded. Now enter your password.</p>
+      {:else}
+      <p class="text-gray-300 mb-1">Paste your wrapped key data (JSON text from backup) and enter the password you used to encrypt it.</p>
+      {/if}
+      <p class="text-gray-400 mb-4 text-sm">Ensure the key data below is correct before proceeding.</p>
       <textarea
         bind:value={wrappedKeyForImport}
-        placeholder="Paste wrapped key JSON here"
+        placeholder="Paste wrapped key JSON here, or it will appear after QR scan"
         class="w-full p-2 mb-4 bg-gray-700 text-gray-100 rounded border border-gray-600 focus:ring-indigo-500 focus:border-indigo-500 h-32"
+        readonly={currentStep === 'enterWrappedKeyForImport' && wrappedKeyForImport !== '' && previousStep === 'qrScanForImport'}
       ></textarea>
       <input
         type="password"
@@ -285,7 +409,7 @@
         >
           Import Account
         </button>
-        <button class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" on:click={() => { currentStep = 'initial'; errorMessage = null; }}>Back</button>
+        <button class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" on:click={() => { currentStep = 'initial'; errorMessage = null; wrappedKeyForImport = ''; passwordInput = ''; }}>Back</button>
       </div>
     </div>
   {/if}
