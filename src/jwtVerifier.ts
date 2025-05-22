@@ -24,23 +24,21 @@ interface JwtHeader {
 }
 
 /**
- * Verifies a JWT login token.
+ * Verifies a JWT login token and returns its payload if valid.
  *
  * @param jwtString The JWT string.
- * @param expectedCallbackUrl The expected callback URL (must match the 'sub' claim).
  * @param publicKey The public key to verify the signature and 'iss' claim.
- * @returns A promise that resolves to true if the JWT is valid, false otherwise.
+ * @returns A promise that resolves to the LoginTokenPayload if the JWT is valid.
+ * @throws Error if the JWT is invalid for any reason.
  */
 export async function verifyLoginJWT(
   jwtString: string,
-  expectedCallbackUrl: string,
   publicKey: CryptoKey
-): Promise<boolean> {
+): Promise<LoginTokenPayload> {
   try {
     const parts = jwtString.split('.');
     if (parts.length !== 3) {
-      console.error("JWT Verifier: Invalid JWT structure (not three parts).");
-      return false;
+      throw new Error("JWT Verifier: Invalid JWT structure (not three parts).");
     }
 
     const encodedHeader = parts[0];
@@ -53,8 +51,7 @@ export async function verifyLoginJWT(
 
     // 2. Check Algorithm
     if (header.alg !== "ES384" || header.typ !== "JWT") {
-      console.error(`JWT Verifier: Invalid JWT header. Expected alg ES384 and typ JWT, got alg ${header.alg} and typ ${header.typ}.`);
-      return false;
+      throw new Error(`JWT Verifier: Invalid JWT header. Expected alg ES384 and typ JWT, got alg ${header.alg} and typ ${header.typ}.`);
     }
 
     // 3. Decode Payload
@@ -64,24 +61,16 @@ export async function verifyLoginJWT(
     // 4. Verify Expiry (exp)
     const nowSeconds = Math.floor(Date.now() / 1000);
     if (payload.exp <= nowSeconds) {
-      console.error(`JWT Verifier: Token expired. Expiry: ${new Date(payload.exp * 1000)}, Current: ${new Date(nowSeconds * 1000)}`);
-      return false;
+      throw new Error(`JWT Verifier: Token expired. Expiry: ${new Date(payload.exp * 1000)}, Current: ${new Date(nowSeconds * 1000)}`);
     }
 
-    // 5. Verify Callback URL (sub)
-    if (payload.sub !== expectedCallbackUrl) {
-      console.error(`JWT Verifier: Callback URL mismatch. Expected: ${expectedCallbackUrl}, Got: ${payload.sub}`);
-      return false;
-    }
-
-    // 6. Verify Public Key (iss)
+    // 5. Verify Public Key (iss) - Callback URL (sub) is part of the payload but not actively verified against an input here.
     const expectedPublicKeyDigest = await getPublicKeyDigest(publicKey);
     if (payload.iss !== expectedPublicKeyDigest) {
-      console.error(`JWT Verifier: Public key digest mismatch (iss claim). Expected: ${expectedPublicKeyDigest}, Got: ${payload.iss}`);
-      return false;
+      throw new Error(`JWT Verifier: Public key digest mismatch (iss claim). Expected: ${expectedPublicKeyDigest}, Got: ${payload.iss}`);
     }
 
-    // 7. Verify Signature
+    // 6. Verify Signature
     const signatureData = base64UrlToArrayBuffer(encodedSignature);
     const dataToVerifyString = `${encodedHeader}.${encodedPayload}`;
     const dataToVerifyBuffer = new TextEncoder().encode(dataToVerifyString);
@@ -97,14 +86,18 @@ export async function verifyLoginJWT(
     );
 
     if (!isValidSignature) {
-      console.error("JWT Verifier: Signature verification failed.");
-      return false;
+      throw new Error("JWT Verifier: Signature verification failed.");
     }
 
+    // If all checks pass, return the payload
     console.log("JWT Verifier: Token successfully verified.");
-    return true;
+    return payload;
   } catch (error: any) {
-    console.error("JWT Verifier: Error during JWT verification:", error.message || error);
-    return false;
+    // Log the original error and re-throw a generic or specific error
+    // If it's already an Error object from our checks, it will have a message.
+    // If it's a parsing error or other unexpected error, wrap it.
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("JWT Verifier: Error during JWT verification:", errorMessage);
+    throw new Error(`JWT Verifier: Verification failed. ${errorMessage}`);
   }
 }
