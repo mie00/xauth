@@ -1,40 +1,50 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import QRCode from 'qrcode';
 
-  export let publicKey: CryptoKey | undefined = undefined;
+  // Svelte 5 Runes: $props, $state, $effect are typically automatically available.
+  // If not (e.g. Runes mode not fully enabled), you might need:
+  // import { $props, $state, $effect } from 'svelte/runes';
 
-  let qrCodeUrl = '';
-  let publicKeyJwkString = '';
+  let { publicKey } = $props<{ publicKey?: CryptoKey }>();
 
-  async function generateQrCode() {
-    if (publicKey) {
-      try {
-        const publicKeyJwk = await window.crypto.subtle.exportKey("jwk", publicKey);
-        publicKeyJwkString = JSON.stringify(publicKeyJwk, null, 2);
-        qrCodeUrl = await QRCode.toDataURL(publicKeyJwkString, { errorCorrectionLevel: 'M', scale: 6 });
-      } catch (error) {
-        console.error("Error generating QR code for public key:", error);
-        qrCodeUrl = ''; // Clear QR code on error
-        publicKeyJwkString = 'Error generating public key data.';
+  let qrCodeUrl = $state('');
+  let publicKeyJwkString = $state('');
+  let generationError = $state<string | null>(null);
+
+  $effect(() => {
+    const currentPublicKey = publicKey; // Capture prop value for the effect
+
+    if (currentPublicKey) {
+      async function generateData() {
+        try {
+          // Reset states before attempting generation
+          publicKeyJwkString = '';
+          qrCodeUrl = '';
+          generationError = null;
+
+          const publicKeyJwk = await window.crypto.subtle.exportKey("jwk", currentPublicKey);
+          const jwkString = JSON.stringify(publicKeyJwk, null, 2);
+          publicKeyJwkString = jwkString; // Update state
+
+          qrCodeUrl = await QRCode.toDataURL(jwkString, { errorCorrectionLevel: 'M', scale: 6 }); // Update state
+        } catch (error) {
+          console.error("Error generating QR code or public key JWK:", error);
+          qrCodeUrl = ''; // Clear QR code on error
+          publicKeyJwkString = ''; // Clear JWK string on error
+          generationError = 'Error generating public key data.'; // Set error state
+        }
       }
-    }
-  }
-
-  // Re-generate QR code if publicKey changes
-  $: if (publicKey) {
-    generateQrCode();
-  }
-
-  onMount(() => {
-    // Generate QR code when component mounts if publicKey is already available
-    if (publicKey) {
-      generateQrCode();
+      generateData();
+    } else {
+      // Reset if publicKey is not available
+      qrCodeUrl = '';
+      publicKeyJwkString = '';
+      generationError = null;
     }
   });
 
   function copyToClipboard() {
-    if (publicKeyJwkString) {
+    if (publicKeyJwkString && !generationError) {
       navigator.clipboard.writeText(publicKeyJwkString)
         .then(() => {
           alert('Public key JWK copied to clipboard!');
@@ -65,13 +75,13 @@
         <div class="bg-white p-4 inline-block rounded-md shadow-md">
           <img src={qrCodeUrl} alt="Public Key QR Code" class="w-64 h-64 md:w-72 md:h-72 object-contain" />
         </div>
-      {:else if publicKeyJwkString.startsWith('Error')}
-        <p class="text-red-400">{publicKeyJwkString}</p>
+      {:else if generationError}
+        <p class="text-red-400">{generationError}</p>
       {:else}
         <p class="text-gray-400">Generating QR code...</p>
       {/if}
 
-      {#if publicKeyJwkString && !publicKeyJwkString.startsWith('Error')}
+      {#if publicKeyJwkString && !generationError}
         <div class="mt-4 w-full max-w-md">
           <button
             on:click={copyToClipboard}
