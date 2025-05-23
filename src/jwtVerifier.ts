@@ -64,11 +64,12 @@ export async function verifyLoginJWT(
       throw new Error(`JWT Verifier: Token expired. Expiry: ${new Date(payload.exp * 1000)}, Current: ${new Date(nowSeconds * 1000)}`);
     }
 
-    // 5. Verify Public Key (iss) - Callback URL (sub) is part of the payload but not actively verified against an input here.
-    const expectedPublicKeyDigest = await getPublicKeyDigest(publicKey);
-    if (payload.iss !== expectedPublicKeyDigest) {
-      throw new Error(`JWT Verifier: Public key digest mismatch (iss claim). Expected: ${expectedPublicKeyDigest}, Got: ${payload.iss}`);
-    }
+    // 5. Verify Public Key (iss) - This claim has been removed from the JWT.
+    // The public key passed to this function is now directly used for signature verification.
+    // const expectedPublicKeyDigest = await getPublicKeyDigest(publicKey); // No longer needed
+    // if (payload.iss !== expectedPublicKeyDigest) { // 'iss' is no longer in payload
+    //   throw new Error(`JWT Verifier: Public key digest mismatch (iss claim). Expected: ${expectedPublicKeyDigest}, Got: ${payload.iss}`);
+    // }
 
     // 6. Verify Signature
     const signatureData = base64UrlToArrayBuffer(encodedSignature);

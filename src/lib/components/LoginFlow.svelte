@@ -7,7 +7,7 @@
     isCallbackUrlTrusted, 
     saveTrustedCallbackUrl 
   } from '../indexedDB';
-  import { createSignedLoginToken } from '../../auth';
+  import { createSignedLoginToken, exportPublicKeyToSpkiBase64Url } from '../../auth';
   import LoadingSpinner from './auth/LoadingSpinner.svelte';
   import ConfirmLoginStep from './auth/ConfirmLoginStep.svelte';
 
@@ -76,10 +76,15 @@
     currentStep = 'processingLogin';
     errorMessage = null;
     try {
-      const jwtToken = await createSignedLoginToken(privateKey, publicKey, callbackUrl.toString(), customPayload);
+      // publicKey is passed to createSignedLoginToken only if it's needed for the token itself.
+      // Since 'iss' is removed, it's not directly needed by createSignedLoginToken anymore.
+      // However, we need the publicKey to send it in the URL.
+      const jwtToken = await createSignedLoginToken(privateKey, callbackUrl.toString(), customPayload);
+      const publicKeySpkiBase64Url = await exportPublicKeyToSpkiBase64Url(publicKey);
       
       const redirectUrl = new URL(callbackUrl.toString());
       redirectUrl.searchParams.set('jwt', jwtToken);
+      redirectUrl.searchParams.set('pubKey', publicKeySpkiBase64Url); // Add public key to URL
       
       window.location.replace(redirectUrl.toString());
       // "Processing login request and redirecting..." message will be shown by this step

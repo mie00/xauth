@@ -5,7 +5,7 @@ const AES_KEY_ALGORITHM = { name: "AES-GCM", length: 256 };
 const WRAPPING_ALGORITHM = { name: "AES-GCM" }; // IV will be generated per wrap
 
 // Helper to convert ArrayBuffer to Base64 string
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
+export function arrayBufferToBase64(buffer: ArrayBuffer): string { // Exported for use elsewhere
   let binary = '';
   const bytes = new Uint8Array(buffer);
   const len = bytes.byteLength;
@@ -16,7 +16,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 }
 
 // Helper to convert ArrayBuffer to Base64url string
-function arrayBufferToBase64Url(buffer: ArrayBuffer): string {
+export function arrayBufferToBase64Url(buffer: ArrayBuffer): string { // Exported for use elsewhere
   return arrayBufferToBase64(buffer)
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
@@ -151,7 +151,7 @@ export async function getPublicKeyDigest(publicKey: CryptoKey): Promise<string> 
 }
 
 export interface LoginTokenPayload {
-  iss: string; // Issuer: Hex encoded SHA-256 digest of the public key
+  // iss claim (public key digest) is removed
   sub: string; // Subject: The callback URL
   exp: number; // Expiry timestamp in seconds since epoch (JWT standard)
   iat: number; // Issued at timestamp in seconds since epoch (JWT standard)
@@ -160,11 +160,12 @@ export interface LoginTokenPayload {
 
 export async function createSignedLoginToken(
   privateKey: CryptoKey,
-  publicKey: CryptoKey,
+  privateKey: CryptoKey,
+  // publicKey is no longer needed to embed its digest in the token
   callbackUrl: string,
   customPayloadData?: string | null
 ): Promise<string> { // Returns the full JWT string
-  const publicKeyDigest = await getPublicKeyDigest(publicKey);
+  // const publicKeyDigest = await getPublicKeyDigest(publicKey); // No longer needed for 'iss'
   const nowSeconds = Math.floor(Date.now() / 1000);
   const expirySeconds = nowSeconds + (24 * 60 * 60); // 1 day from now in seconds
 
@@ -177,7 +178,7 @@ export async function createSignedLoginToken(
 
   // JWT Payload
   const payload: LoginTokenPayload = {
-    iss: publicKeyDigest,
+    // iss: publicKeyDigest, // Removed
     sub: callbackUrl,
     exp: expirySeconds,
     iat: nowSeconds,
@@ -205,6 +206,11 @@ export async function createSignedLoginToken(
 
   // Assemble the JWT
   return `${signingInput}.${encodedSignature}`;
+}
+
+export async function exportPublicKeyToSpkiBase64Url(publicKey: CryptoKey): Promise<string> {
+  const spkiBuffer = await window.crypto.subtle.exportKey('spki', publicKey);
+  return arrayBufferToBase64Url(spkiBuffer);
 }
 
 // --- End Login Token Functions ---
