@@ -58,6 +58,19 @@
         return window.btoa(binary);
       }
 
+      // Helper function to encode Uint8Array to Base64URL
+      function uint8ArrayToBase64Url(buffer: Uint8Array): string {
+        let binary = '';
+        const len = buffer.byteLength;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(buffer[i]);
+        }
+        return window.btoa(binary)
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+      }
+
       async function generateData() {
         try {
           // Reset states before attempting generation
@@ -80,8 +93,8 @@
           concatenatedBytes.set(xBytes, 0);
           concatenatedBytes.set(yBytes, xBytes.length);
 
-          const base64Data = uint8ArrayToBase64(concatenatedBytes);
-          imageUrl = `http://localhost:5005/generate-image?data=${base64Data}`; // Update state
+          const base64UrlData = uint8ArrayToBase64Url(concatenatedBytes);
+          imageUrl = `http://localhost:5005/generate-image?data=${base64UrlData}`; // Update state
 
         } catch (error) {
           console.error("Error generating image URL or public key JWK:", error);
