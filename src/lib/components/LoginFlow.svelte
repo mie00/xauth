@@ -140,9 +140,9 @@
   {/if}
 
   {#if currentStep === 'accountCreationRequired'}
-    <div class="mb-4 text-center">
-      <h2 class="text-xl font-semibold text-gray-100">Create Account to Continue</h2>
-      <p class="text-gray-300 mb-4">You need to set up an account before you can log in.</p>
+    <div class="p-3 mb-4 bg-yellow-200 text-yellow-800 rounded-md w-full text-sm">
+      <h2 class="font-semibold">Create Account to Continue</h2>
+      <p>You need to set up an account before you can log in.</p>
     </div>
     <AuthFlow loginContinuationUrl={window.location.href} />
   {/if}
