@@ -28,6 +28,8 @@
     | 'enterWrappedKeyForImport'
     | 'error';
 
+  let { loginContinuationUrl = null }: { loginContinuationUrl?: string | null } = $props();
+
   let currentStep: AuthStep = $state('loading');
   let errorMessage: string | null = $state(null);
   let userPrivateKey: CryptoKey | undefined = $state(undefined);
@@ -178,7 +180,7 @@
   {/if}
 
   {#if currentStep === 'userReady'}
-    <UserReadyStep publicKey={userPublicKey} />
+    <UserReadyStep publicKey={userPublicKey} {loginContinuationUrl} />
   {/if}
 
   {#if currentStep === 'error'}

@@ -8,12 +8,13 @@
     saveTrustedCallbackUrl 
   } from '../indexedDB';
   import { createSignedLoginToken, exportPublicKeyToSpkiBase64Url } from '../../auth';
+  import AuthFlow from '../AuthFlow.svelte'; // Import AuthFlow
   import LoadingSpinner from './auth/LoadingSpinner.svelte';
   import ConfirmLoginStep from './auth/ConfirmLoginStep.svelte';
 
   const {rawCallbackParam, loginPayloadData}:{rawCallbackParam: string | null, loginPayloadData?: string | null} = $props();
 
-  type LoginStep = 'loading' | 'awaitingConfirmation' | 'processingLogin' | 'error';
+  type LoginStep = 'loading' | 'awaitingConfirmation' | 'processingLogin' | 'error' | 'accountCreationRequired';
   let currentStep: LoginStep = $state('loading');
   let errorMessage: string | null = $state(null);
   let parsedCallbackUrl: URL | null = $state(null);
@@ -53,8 +54,8 @@
       const publicKey = await loadKey(PUBLIC_KEY_NAME);
 
       if (!privateKey || !publicKey) {
-        errorMessage = "User keys not found. Please set up your identity on the main page before using the /login route.";
-        currentStep = 'error';
+        // Keys not found, initiate account creation flow as part of login
+        currentStep = 'accountCreationRequired';
         return;
       }
 
@@ -136,6 +137,14 @@
   {#if currentStep === 'loading'}
     <LoadingSpinner />
     <p class="mt-4 text-center text-gray-600">Initializing login...</p>
+  {/if}
+
+  {#if currentStep === 'accountCreationRequired'}
+    <div class="mb-4 text-center">
+      <h2 class="text-xl font-semibold text-gray-100">Create Account to Continue</h2>
+      <p class="text-gray-300 mb-4">You need to set up an account before you can log in.</p>
+    </div>
+    <AuthFlow loginContinuationUrl={window.location.href} />
   {/if}
 
   {#if currentStep === 'awaitingConfirmation' && parsedCallbackUrl}
