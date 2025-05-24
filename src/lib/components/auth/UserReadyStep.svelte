@@ -98,6 +98,7 @@
   {/if}
 
   {#if publicKey}
+    {#if !loginContinuationUrl}
     <div class="text-center space-y-4 mt-4">
       <h3 class="text-xl font-semibold">Your Public Key</h3>
       <p class="text-sm text-gray-400">
@@ -130,6 +131,7 @@
         </div>
       {/if}
     </div>
+    {/if}
   {:else}
     <p class="text-center text-gray-400">Public key not available.</p>
   {/if}
