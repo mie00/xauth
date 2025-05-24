@@ -4,8 +4,8 @@
     PUBLIC_KEY_NAME, 
     PRIVATE_KEY_NAME, 
     loadKey, 
-    isCallbackUrlTrusted, 
-    saveTrustedCallbackUrl 
+    isOriginTrusted, 
+    saveTrustedOrigin 
   } from '../indexedDB';
   import { createSignedLoginToken, exportPublicKeyToSpkiBase64Url } from '../../auth';
   import AuthFlow from './AuthFlow.svelte'; // Import AuthFlow
@@ -59,7 +59,7 @@
         return;
       }
 
-      const isTrusted = await isCallbackUrlTrusted(parsedCallbackUrl.toString());
+      const isTrusted = await isOriginTrusted(parsedCallbackUrl.origin);
 
       if (isTrusted) {
         await proceedWithLogin(privateKey, publicKey, parsedCallbackUrl, loginPayloadData);
@@ -104,8 +104,8 @@
     }
     currentStep = 'loading'; // Show loader while saving and fetching keys again
     try {
-      await saveTrustedCallbackUrl(parsedCallbackUrl.toString());
-      console.log(`Callback URL ${parsedCallbackUrl.toString()} saved as trusted.`);
+      await saveTrustedOrigin(parsedCallbackUrl.origin);
+      console.log(`Origin ${parsedCallbackUrl.origin} saved as trusted.`);
       
       // Re-fetch keys to pass to proceedWithLogin, or ensure they are still in scope
       // For simplicity, re-fetching, though they could be stored in component state if preferred
@@ -148,7 +148,7 @@
   {/if}
 
   {#if currentStep === 'awaitingConfirmation' && parsedCallbackUrl}
-    <ConfirmLoginStep callbackUrl={parsedCallbackUrl.toString()} onconfirm={handleConfirm} oncancel={handleCancel} />
+    <ConfirmLoginStep origin={parsedCallbackUrl.origin} onconfirm={handleConfirm} oncancel={handleCancel} />
   {/if}
 
   {#if currentStep === 'processingLogin'}
