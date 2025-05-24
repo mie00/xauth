@@ -32,7 +32,7 @@
           countdownInterval = null;
           window.location.href = currentLoginContinuationUrl;
         }
-      }, 1000);
+      }, 1000) as unknown as number;
     } else if (currentPublicKey) { // Only generate QR/JWK if not in redirect mode or if public key is available
       async function generateData() {
         try {
@@ -98,7 +98,7 @@
   {/if}
 
   {#if publicKey}
-    <div class="text-center space-y-4 mt-4"> {/* Added mt-4 for spacing if header is present */}
+    <div class="text-center space-y-4 mt-4">
       <h3 class="text-xl font-semibold">Your Public Key</h3>
       <p class="text-sm text-gray-400">
         Scan this QR code to import your public key elsewhere (e.g., for verification or setting up trusted devices).
