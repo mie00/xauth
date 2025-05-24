@@ -1,4 +1,4 @@
-import { getPublicKeyDigest, type LoginTokenPayload } from './auth';
+import { type LoginTokenPayload } from './auth';
 
 // Helper to convert Base64url string to ArrayBuffer
 // JWT uses Base64url encoding

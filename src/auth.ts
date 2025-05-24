@@ -160,7 +160,6 @@ export interface LoginTokenPayload {
 
 export async function createSignedLoginToken(
   privateKey: CryptoKey,
-  privateKey: CryptoKey,
   // publicKey is no longer needed to embed its digest in the token
   callbackUrl: string,
   customPayloadData?: string | null

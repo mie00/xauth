@@ -16,9 +16,11 @@
 <div id="enterPasswordCreateSection" class="bg-gray-800 p-6 rounded-lg shadow-md mb-6 text-center">
   <h2 class="text-2xl font-semibold mb-4 text-gray-100">Create New Account</h2>
   <p class="text-gray-300 mb-4">Enter a strong password to secure your new account key. This password will be required to export/import your key.</p>
+  <!-- svelte-ignore a11y_autofocus -->
   <input
     type="password"
     bind:value={passwordInput}
+    autofocus
     placeholder="Enter password"
     class="w-full p-2 mb-4 bg-gray-700 text-gray-100 rounded border border-gray-600 focus:ring-indigo-500 focus:border-indigo-500"
   />
