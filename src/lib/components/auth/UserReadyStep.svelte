@@ -11,7 +11,7 @@
   let publicKeyJwkString = $state('');
   let generationError = $state<string | null>(null);
   let countdown = $state(5);
-  let countdownInterval = $state<number | null>(null);
+  let countdownInterval: number | null = null; // Changed from $state to let
 
   $effect(() => {
     const currentPublicKey = publicKey; 
