@@ -8,7 +8,7 @@
     saveTrustedCallbackUrl 
   } from '../indexedDB';
   import { createSignedLoginToken, exportPublicKeyToSpkiBase64Url } from '../../auth';
-  import AuthFlow from '../AuthFlow.svelte'; // Import AuthFlow
+  import AuthFlow from './AuthFlow.svelte'; // Import AuthFlow
   import LoadingSpinner from './auth/LoadingSpinner.svelte';
   import ConfirmLoginStep from './auth/ConfirmLoginStep.svelte';
 
