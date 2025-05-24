@@ -1,13 +1,11 @@
 <script lang="ts">
-  import QRCode from 'qrcode';
-
   // Svelte 5 Runes: $props, $state, $effect are typically automatically available.
   // If not (e.g. Runes mode not fully enabled), you might need:
   // import { $props, $state, $effect } from 'svelte/runes';
 
   let { publicKey, loginContinuationUrl = null } = $props<{ publicKey?: CryptoKey, loginContinuationUrl?: string | null }>();
 
-  let qrCodeUrl = $state('');
+  let imageUrl = $state('');
   let publicKeyJwkString = $state('');
   let generationError = $state<string | null>(null);
   let countdown = $state(5);
@@ -33,30 +31,69 @@
           window.location.href = currentLoginContinuationUrl;
         }
       }, 1000) as unknown as number;
-    } else if (currentPublicKey) { // Only generate QR/JWK if not in redirect mode or if public key is available
+    } else if (currentPublicKey) { // Only generate image/JWK if not in redirect mode or if public key is available
+      // Helper function to decode Base64URL to Uint8Array
+      function base64UrlToUint8Array(base64urlString: string): Uint8Array {
+        let base64 = base64urlString.replace(/-/g, '+').replace(/_/g, '/');
+        const padding = base64.length % 4;
+        if (padding) {
+          base64 += '='.repeat(4 - padding);
+        }
+        const binary_string = window.atob(base64);
+        const len = binary_string.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binary_string.charCodeAt(i);
+        }
+        return bytes;
+      }
+
+      // Helper function to encode Uint8Array to Base64
+      function uint8ArrayToBase64(buffer: Uint8Array): string {
+        let binary = '';
+        const len = buffer.byteLength;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(buffer[i]);
+        }
+        return window.btoa(binary);
+      }
+
       async function generateData() {
         try {
           // Reset states before attempting generation
           publicKeyJwkString = '';
-          qrCodeUrl = '';
+          imageUrl = '';
           generationError = null;
 
           const publicKeyJwk = await window.crypto.subtle.exportKey("jwk", currentPublicKey);
           const jwkString = JSON.stringify(publicKeyJwk, null, 2);
           publicKeyJwkString = jwkString; // Update state
 
-          qrCodeUrl = await QRCode.toDataURL(jwkString, { errorCorrectionLevel: 'M', scale: 6 }); // Update state
+          if (!publicKeyJwk.x || !publicKeyJwk.y) {
+            throw new Error("JWK must contain x and y coordinates for an EC public key.");
+          }
+
+          const xBytes = base64UrlToUint8Array(publicKeyJwk.x);
+          const yBytes = base64UrlToUint8Array(publicKeyJwk.y);
+
+          const concatenatedBytes = new Uint8Array(xBytes.length + yBytes.length);
+          concatenatedBytes.set(xBytes, 0);
+          concatenatedBytes.set(yBytes, xBytes.length);
+
+          const base64Data = uint8ArrayToBase64(concatenatedBytes);
+          imageUrl = `http://localhost:5005/generate-image?data=${base64Data}`; // Update state
+
         } catch (error) {
-          console.error("Error generating QR code or public key JWK:", error);
-          qrCodeUrl = ''; // Clear QR code on error
+          console.error("Error generating image URL or public key JWK:", error);
+          imageUrl = ''; // Clear image URL on error
           publicKeyJwkString = ''; // Clear JWK string on error
-          generationError = 'Error generating public key data.'; // Set error state
+          generationError = 'Error generating public key data for image.'; // Set error state
         }
       }
       generateData();
     } else {
       // Reset if publicKey is not available
-      qrCodeUrl = '';
+      imageUrl = '';
       publicKeyJwkString = '';
       generationError = null;
     }
@@ -102,18 +139,17 @@
     <div class="text-center space-y-4 mt-4">
       <h3 class="text-xl font-semibold">Your Public Key</h3>
       <p class="text-sm text-gray-400">
-        Scan this QR code to import your public key elsewhere (e.g., for verification or setting up trusted devices).
-        This key is in JWK (JSON Web Key) format.
+        Below is a visual representation of your public key. You can also copy the full public key in JWK format.
       </p>
 
-      {#if qrCodeUrl}
+      {#if imageUrl}
         <div class="bg-white p-4 inline-block rounded-md shadow-md">
-          <img src={qrCodeUrl} alt="Public Key QR Code" class="w-64 h-64 md:w-72 md:h-72 object-contain" />
+          <img src={imageUrl} alt="Public Key Visual Representation" class="w-64 h-64 md:w-72 md:h-72 object-contain" />
         </div>
       {:else if generationError}
         <p class="text-red-400">{generationError}</p>
       {:else}
-        <p class="text-gray-400">Generating QR code...</p>
+        <p class="text-gray-400">Generating key image...</p>
       {/if}
 
       {#if publicKeyJwkString && !generationError}
