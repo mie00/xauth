@@ -1,12 +1,12 @@
 <script lang="ts">
-  const { callbackUrl = '', onconfirm, oncancel }: { callbackUrl: string, onconfirm: () => void, oncancel: () => void } = $props();
+  const { origin = '', onconfirm, oncancel }: { origin: string, onconfirm: () => void, oncancel: () => void } = $props();
 </script>
 
 <div class="p-6 bg-white shadow-md rounded-lg text-center">
   <h2 class="text-xl font-semibold mb-4 text-gray-700">Confirm Login</h2>
   <p class="mb-2 text-gray-600">An application is requesting to log in with your identity.</p>
-  <p class="mb-1 text-gray-600">Callback URL:</p>
-  <p class="mb-6 text-sm font-mono bg-gray-100 text-gray-600 p-2 rounded break-all">{callbackUrl}</p>
+  <p class="mb-1 text-gray-600">Origin:</p>
+  <p class="mb-6 text-sm font-mono bg-gray-100 text-gray-600 p-2 rounded break-all">{origin}</p>
 
   <p class="mb-6 text-gray-600">Do you want to allow this application to log in?</p>
 
