@@ -28,12 +28,7 @@ jobs:
         run: npm install # or yarn install or pnpm install
 
       - name: Build project
-        run: npm run build # or yarn build or pnpm build
-        env:
-          # If your build needs environment variables, set them here
-          # For example, if you have a base path for non-custom domain deploys:
-          # BASE_URL: ${{ github.event_name == 'workflow_dispatch' && github.repository_owner != 'YourGitHubUsernameOrOrg' && format('/{0}', github.event.repository.name) || '' }}
-          # For a custom domain, BASE_URL is usually not needed or should be '/'
+        run: npm run build
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3

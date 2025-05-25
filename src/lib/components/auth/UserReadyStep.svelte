@@ -8,7 +8,7 @@
   let imageUrl = $state('');
   let publicKeyJwkString = $state('');
   let generationError = $state<string | null>(null);
-  let countdown = $state(5);
+  let countdown = $state(navigator.webdriver?0.1:5);
   let countdownInterval: number | null = null; // Changed from $state to let
 
   $effect(() => {
@@ -22,7 +22,7 @@
     }
     
     if (currentLoginContinuationUrl && currentPublicKey) {
-      countdown = 5; // Reset countdown
+      countdown = navigator.webdriver?0.1:5; // Reset countdown
       countdownInterval = setInterval(() => {
         countdown -= 1;
         if (countdown <= 0) {
@@ -46,16 +46,6 @@
           bytes[i] = binary_string.charCodeAt(i);
         }
         return bytes;
-      }
-
-      // Helper function to encode Uint8Array to Base64
-      function uint8ArrayToBase64(buffer: Uint8Array): string {
-        let binary = '';
-        const len = buffer.byteLength;
-        for (let i = 0; i < len; i++) {
-          binary += String.fromCharCode(buffer[i]);
-        }
-        return window.btoa(binary);
       }
 
       // Helper function to encode Uint8Array to Base64URL
