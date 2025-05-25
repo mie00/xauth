@@ -10,6 +10,7 @@
   let qrCodeUrl = $state('');
   let publicKeyJwkString = $state('');
   let generationError = $state<string | null>(null);
+  let imageFailedToLoad = $state(false); // New state for tracking image load failure
   let countdown = $state(navigator.webdriver?0.1:5);
   let countdownInterval: number | null = null; // Changed from $state to let
 
@@ -70,45 +71,59 @@
           imageUrl = '';
           qrCodeUrl = '';
           generationError = null;
+          imageFailedToLoad = false; // Reset image load failure flag
 
-          const publicKeyJwk = await window.crypto.subtle.exportKey("jwk", currentPublicKey);
-          const jwkString = JSON.stringify(publicKeyJwk, null, 2);
-          publicKeyJwkString = jwkString; // Update state
+          let jwkForQrGeneration: string | null = null;
 
-          if (!publicKeyJwk.x || !publicKeyJwk.y) {
-            throw new Error("JWK must contain x and y coordinates for an EC public key.");
+          try {
+            const publicKeyJwk = await window.crypto.subtle.exportKey("jwk", currentPublicKey);
+            const jwkString = JSON.stringify(publicKeyJwk, null, 2);
+            publicKeyJwkString = jwkString; // Update state for display/copy
+            jwkForQrGeneration = jwkString;
+
+            // Attempt to generate imageUrl
+            try {
+              if (!publicKeyJwk.x || !publicKeyJwk.y) {
+                throw new Error("JWK must contain x and y coordinates for an EC public key to generate image.");
+              }
+              const xBytes = base64UrlToUint8Array(publicKeyJwk.x);
+              const yBytes = base64UrlToUint8Array(publicKeyJwk.y);
+              const concatenatedBytes = new Uint8Array(xBytes.length + yBytes.length);
+              concatenatedBytes.set(xBytes, 0);
+              concatenatedBytes.set(yBytes, xBytes.length);
+              const base64UrlData = uint8ArrayToBase64Url(concatenatedBytes);
+              imageUrl = `http://localhost:5005/generate-image?data=${base64UrlData}`;
+            } catch (imageGenError) {
+              console.error("Error generating image URL:", imageGenError);
+              imageUrl = ''; // Clear image URL on its specific error
+              generationError = (generationError || '') + 'Failed to generate visual key image. ';
+            }
+
+          } catch (jwkError) {
+            console.error("Error exporting public key JWK:", jwkError);
+            publicKeyJwkString = ''; // Clear JWK string on error
+            generationError = 'Error generating public key data (JWK export failed).';
+            // No point in trying image or QR if JWK fails, so jwkForQrGeneration remains null
           }
 
-          const xBytes = base64UrlToUint8Array(publicKeyJwk.x);
-          const yBytes = base64UrlToUint8Array(publicKeyJwk.y);
-
-          const concatenatedBytes = new Uint8Array(xBytes.length + yBytes.length);
-          concatenatedBytes.set(xBytes, 0);
-          concatenatedBytes.set(yBytes, xBytes.length);
-
-          const base64UrlData = uint8ArrayToBase64Url(concatenatedBytes);
-          imageUrl = `http://localhost:5005/generate-image?data=${base64UrlData}`; // Update state
-
-        } catch (imageError) {
-          console.error("Error generating image URL:", imageError);
-          imageUrl = ''; // Clear image URL on error
-          generationError = 'Error generating visual key image. '; 
-
-          // Fallback to QR code generation
-          if (publicKeyJwkString) {
+          // Attempt to generate qrCodeUrl if JWK was successfully exported
+          if (jwkForQrGeneration) {
             try {
-              qrCodeUrl = await QRCode.toDataURL(publicKeyJwkString, { errorCorrectionLevel: 'M', scale: 6 });
-              generationError += 'Displaying QR code as fallback.';
-            } catch (qrError) {
-              console.error("Error generating QR code as fallback:", qrError);
-              publicKeyJwkString = ''; // Clear JWK string on dual error
-              generationError = 'Error generating public key data for image and QR code.';
+              qrCodeUrl = await QRCode.toDataURL(jwkForQrGeneration, { errorCorrectionLevel: 'M', scale: 6 });
+            } catch (qrGenError) {
+              console.error("Error generating QR code:", qrGenError);
+              qrCodeUrl = ''; // Clear QR code URL on its specific error
+              generationError = (generationError || '') + 'Failed to generate QR code. ';
             }
-          } else {
-            // This case should ideally not be reached if publicKeyJwk was generated before image attempt.
-            // But as a safeguard:
-            publicKeyJwkString = ''; 
-            generationError = 'Error generating public key data; cannot generate image or QR code.';
+          }
+          
+          // Final error state if nothing could be generated
+          if (!imageUrl && !qrCodeUrl && !generationError) {
+            // This might occur if JWK export was fine, but both image and QR gen failed silently (unlikely with current catches)
+            generationError = 'Could not generate visual key or QR code.';
+          } else if (!imageUrl && !qrCodeUrl && generationError && !generationError.includes('JWK export failed')) {
+            // If both are empty, and there was some error after JWK success
+            // generationError should already be descriptive from individual catches.
           }
         }
       }
@@ -118,6 +133,7 @@
       imageUrl = '';
       qrCodeUrl = '';
       publicKeyJwkString = '';
+      imageFailedToLoad = false;
       generationError = null;
     }
 
@@ -165,17 +181,24 @@
         Below is a visual representation of your public key. If it fails to load, a QR code will be shown. You can also copy the full public key in JWK format.
       </p>
 
-      {#if imageUrl}
+      {#if imageUrl && !imageFailedToLoad}
         <div class="bg-white p-4 inline-block rounded-md shadow-md">
-          <img src={imageUrl} alt="Public Key Visual Representation" class="w-64 h-64 md:w-72 md:h-72 object-contain" 
-               onerror={() => { console.warn('Image failed to load, attempting QR fallback.'); imageUrl = ''; /* This will trigger re-render for QR */ }} />
+          <img 
+            src={imageUrl} 
+            alt="Public Key Visual Representation" 
+            class="w-64 h-64 md:w-72 md:h-72 object-contain" 
+            onerror={() => { 
+              console.warn('Visual key image failed to load. Attempting QR code fallback.'); 
+              imageFailedToLoad = true; 
+            }} 
+          />
         </div>
-      {:else if qrCodeUrl}
+      {:else if qrCodeUrl} <!-- This shows if imageUrl is empty OR imageFailedToLoad is true -->
         <div class="bg-white p-4 inline-block rounded-md shadow-md">
           <img src={qrCodeUrl} alt="Public Key QR Code" class="w-64 h-64 md:w-72 md:h-72 object-contain" />
         </div>
-        {#if generationError && generationError.includes('QR code as fallback')}
-          <p class="text-orange-400 text-xs mt-2">{generationError}</p>
+        {#if imageFailedToLoad && imageUrl && qrCodeUrl} <!-- Only show this specific message if primary image *failed* to load and QR is the fallback -->
+          <p class="text-orange-400 text-xs mt-2">Visual key image failed to load. Displaying QR code as fallback.</p>
         {/if}
       {:else if generationError}
         <p class="text-red-400">{generationError}</p>
@@ -183,7 +206,7 @@
         <p class="text-gray-400">Generating key data...</p>
       {/if}
 
-      {#if publicKeyJwkString && !(generationError && !qrCodeUrl)}
+      {#if publicKeyJwkString && (!generationError || qrCodeUrl || imageUrl)} <!-- Show copy button if JWK is available and either image or QR could be generated or was attempted -->
         <div class="mt-4 w-full max-w-md">
           <button
             onclick={copyToClipboard}
