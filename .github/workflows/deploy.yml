@@ -1,0 +1,52 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main # Or your default branch
+  workflow_dispatch: # Allows manual triggering
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20" # Specify your Node.js version
+          cache: 'npm' # or 'yarn' or 'pnpm'
+
+      - name: Install dependencies
+        run: npm install # or yarn install or pnpm install
+
+      - name: Build project
+        run: npm run build # or yarn build or pnpm build
+        env:
+          # If your build needs environment variables, set them here
+          # For example, if you have a base path for non-custom domain deploys:
+          # BASE_URL: ${{ github.event_name == 'workflow_dispatch' && github.repository_owner != 'YourGitHubUsernameOrOrg' && format('/{0}', github.event.repository.name) || '' }}
+          # For a custom domain, BASE_URL is usually not needed or should be '/'
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist # Default output directory for Vite
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
