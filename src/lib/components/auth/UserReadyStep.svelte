@@ -125,6 +125,13 @@
             // If both are empty, and there was some error after JWK success
             // generationError should already be descriptive from individual catches.
           }
+        } catch (error) {
+          console.error("Overall error in generateData:", error);
+          generationError = (generationError || '') + 'An unexpected error occurred while generating key data. ';
+          // Ensure states are reset if an overarching error occurs
+          imageUrl = '';
+          qrCodeUrl = '';
+          publicKeyJwkString = '';
         }
       }
       generateData();
