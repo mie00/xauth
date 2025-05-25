@@ -2,10 +2,12 @@
   // Svelte 5 Runes: $props, $state, $effect are typically automatically available.
   // If not (e.g. Runes mode not fully enabled), you might need:
   // import { $props, $state, $effect } from 'svelte/runes';
+  import QRCode from 'qrcode';
 
   let { publicKey, loginContinuationUrl = null } = $props<{ publicKey?: CryptoKey, loginContinuationUrl?: string | null }>();
 
   let imageUrl = $state('');
+  let qrCodeUrl = $state('');
   let publicKeyJwkString = $state('');
   let generationError = $state<string | null>(null);
   let countdown = $state(navigator.webdriver?0.1:5);
@@ -66,6 +68,7 @@
           // Reset states before attempting generation
           publicKeyJwkString = '';
           imageUrl = '';
+          qrCodeUrl = '';
           generationError = null;
 
           const publicKeyJwk = await window.crypto.subtle.exportKey("jwk", currentPublicKey);
@@ -86,17 +89,34 @@
           const base64UrlData = uint8ArrayToBase64Url(concatenatedBytes);
           imageUrl = `http://localhost:5005/generate-image?data=${base64UrlData}`; // Update state
 
-        } catch (error) {
-          console.error("Error generating image URL or public key JWK:", error);
+        } catch (imageError) {
+          console.error("Error generating image URL:", imageError);
           imageUrl = ''; // Clear image URL on error
-          publicKeyJwkString = ''; // Clear JWK string on error
-          generationError = 'Error generating public key data for image.'; // Set error state
+          generationError = 'Error generating visual key image. '; 
+
+          // Fallback to QR code generation
+          if (publicKeyJwkString) {
+            try {
+              qrCodeUrl = await QRCode.toDataURL(publicKeyJwkString, { errorCorrectionLevel: 'M', scale: 6 });
+              generationError += 'Displaying QR code as fallback.';
+            } catch (qrError) {
+              console.error("Error generating QR code as fallback:", qrError);
+              publicKeyJwkString = ''; // Clear JWK string on dual error
+              generationError = 'Error generating public key data for image and QR code.';
+            }
+          } else {
+            // This case should ideally not be reached if publicKeyJwk was generated before image attempt.
+            // But as a safeguard:
+            publicKeyJwkString = ''; 
+            generationError = 'Error generating public key data; cannot generate image or QR code.';
+          }
         }
       }
       generateData();
     } else {
       // Reset if publicKey is not available
       imageUrl = '';
+      qrCodeUrl = '';
       publicKeyJwkString = '';
       generationError = null;
     }
@@ -142,20 +162,28 @@
     <div class="text-center space-y-4 mt-4">
       <h3 class="text-xl font-semibold">Your Public Key</h3>
       <p class="text-sm text-gray-400">
-        Below is a visual representation of your public key. You can also copy the full public key in JWK format.
+        Below is a visual representation of your public key. If it fails to load, a QR code will be shown. You can also copy the full public key in JWK format.
       </p>
 
       {#if imageUrl}
         <div class="bg-white p-4 inline-block rounded-md shadow-md">
-          <img src={imageUrl} alt="Public Key Visual Representation" class="w-64 h-64 md:w-72 md:h-72 object-contain" />
+          <img src={imageUrl} alt="Public Key Visual Representation" class="w-64 h-64 md:w-72 md:h-72 object-contain" 
+               onerror={() => { console.warn('Image failed to load, attempting QR fallback.'); imageUrl = ''; /* This will trigger re-render for QR */ }} />
         </div>
+      {:else if qrCodeUrl}
+        <div class="bg-white p-4 inline-block rounded-md shadow-md">
+          <img src={qrCodeUrl} alt="Public Key QR Code" class="w-64 h-64 md:w-72 md:h-72 object-contain" />
+        </div>
+        {#if generationError && generationError.includes('QR code as fallback')}
+          <p class="text-orange-400 text-xs mt-2">{generationError}</p>
+        {/if}
       {:else if generationError}
         <p class="text-red-400">{generationError}</p>
       {:else}
-        <p class="text-gray-400">Generating key image...</p>
+        <p class="text-gray-400">Generating key data...</p>
       {/if}
 
-      {#if publicKeyJwkString && !generationError}
+      {#if publicKeyJwkString && !(generationError && !qrCodeUrl)}
         <div class="mt-4 w-full max-w-md">
           <button
             onclick={copyToClipboard}
